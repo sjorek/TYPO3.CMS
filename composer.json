@@ -46,6 +46,7 @@
 	"suggest": {
 		"ext-gd": "GDlib/Freetype is required for building images with text (GIFBUILDER) and can also be used to scale images",
 		"ext-zlib": "TYPO3 uses zlib for amongst others output compression and un/packing t3x extension files",
+		"ext-intl" : "TYPO3 prefers intl-extension's Normalizer-implementation to provide unicode-normalization",
 		"ext-openssl": "",
 		"ext-soap": "",
 		"ext-zip": ""

@@ -61,6 +61,7 @@ class AjaxRequestHandler {
 		}
 		// If the AJAX request does not have the same encoding like the backend
 		// we need to convert the POST and GET parameters in the right charset
+		// TODO Feature #57695: Figure out if we need/want unicode-normalization as well … OPEN I still need to test if ajax-charset-handling really needs unicode-normalization
 		if ($this->charset != $this->requestCharset) {
 			$GLOBALS['LANG']->csConvObj->convArray($_POST, $this->requestCharset, $this->charset);
 			$GLOBALS['LANG']->csConvObj->convArray($_GET, $this->requestCharset, $this->charset);

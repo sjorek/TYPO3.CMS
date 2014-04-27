@@ -15,6 +15,7 @@ namespace TYPO3\CMS\Core\Tests\Unit\Resource\Driver;
  */
 
 use TYPO3\CMS\Core\Utility\GeneralUtility;
+use TYPO3\CMS\Core\Charset\UnicodeNormalizer;
 use \org\bovigo\vfs\vfsStream;
 use \org\bovigo\vfs\vfsStreamWrapper;
 
@@ -1298,6 +1299,7 @@ class LocalDriverTest extends \TYPO3\CMS\Core\Tests\Unit\Resource\BaseTestCase {
 
 	/**
 	 * Set up data for sanitizeFileName tests
+	 * @todo TODO Feature #57695: Test all unicode-normalization forms, this seems to cover NFC only, see http://forge.typo3.org/issues/57695
 	 */
 	public function setUpCharacterStrings() {
 		// Generate string containing all characters for the iso8859-1 charset, charcode greater than 127
@@ -1339,7 +1341,7 @@ class LocalDriverTest extends \TYPO3\CMS\Core\Tests\Unit\Resource\BaseTestCase {
 	 */
 	public function sanitizeFileNameUTF8FilesystemDataProvider() {
 		$this->setUpCharacterStrings();
-		return array(
+		$payload = array(
 			// Characters ordered by ASCII table
 			'allowed characters utf-8 (ASCII part)' => array(
 				'-.0123456789@ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz',
@@ -1363,14 +1365,29 @@ class LocalDriverTest extends \TYPO3\CMS\Core\Tests\Unit\Resource\BaseTestCase {
 				'test.txt'
 			),
 		);
+		$utf8filesystems = array(
+				'utf8-filesystem without unicode-normalization' => UnicodeNormalizer::NONE,
+				'utf8-filesystem with unicode-normalization NFD' => UnicodeNormalizer::NFD,
+				'utf8-filesystem with unicode-normalization NFKD' => UnicodeNormalizer::NFKD,
+				'utf8-filesystem with unicode-normalization NFC' => UnicodeNormalizer::NFC,
+				'utf8-filesystem with unicode-normalization NFKC' => UnicodeNormalizer::NFKC,
+		);
+		$data = array();
+		foreach($utf8filesystems as $suffix => $normalization) {
+			foreach($payload as $key => $arguments) {
+				$data[$key.' for '.$suffix] = $arguments;
+				$data[$key.' for '.$suffix][] = $normalization;
+			}
+		}
+		return $data;
 	}
 
 	/**
 	 * @test
 	 * @dataProvider sanitizeFileNameUTF8FilesystemDataProvider
 	 */
-	public function sanitizeFileNameUTF8Filesystem($fileName, $expectedResult) {
-		$GLOBALS['TYPO3_CONF_VARS']['SYS']['UTF8filesystem'] = 1;
+	public function sanitizeFileNameUTF8Filesystem($fileName, $expectedResult, $UTF8filesystem) {
+		$GLOBALS['TYPO3_CONF_VARS']['SYS']['UTF8filesystem'] = $UTF8filesystem;
 		$this->assertEquals(
 			$expectedResult,
 			$this->createDriverFixture()->sanitizeFileName($fileName)
@@ -1468,12 +1485,23 @@ class LocalDriverTest extends \TYPO3\CMS\Core\Tests\Unit\Resource\BaseTestCase {
 		);
 	}
 
+	public function sanitizeFileNameThrowsExceptionOnInvalidFileNameDataProvider() {
+		return array(
+			'utf8-filesystem without unicode-normalization' => array(UnicodeNormalizer::NONE),
+			'utf8-filesystem with unicode-normalization NFD' => array(UnicodeNormalizer::NFD),
+			'utf8-filesystem with unicode-normalization NFKD' => array(UnicodeNormalizer::NFKD),
+			'utf8-filesystem with unicode-normalization NFC' => array(UnicodeNormalizer::NFC),
+			'utf8-filesystem with unicode-normalization NFKC' => array(UnicodeNormalizer::NFKC),
+		);
+	}
+
 	/**
 	 * @test
+	 * @dataProvider sanitizeFileNameThrowsExceptionOnInvalidFileNameDataProvider
 	 * @expectedException \TYPO3\CMS\Core\Resource\Exception\InvalidFileNameException
 	 */
-	public function sanitizeFileNameThrowsExceptionOnInvalidFileName() {
-		$GLOBALS['TYPO3_CONF_VARS']['SYS']['UTF8filesystem'] = 1;
+	public function sanitizeFileNameThrowsExceptionOnInvalidFileName($UTF8filesystem) {
+		$GLOBALS['TYPO3_CONF_VARS']['SYS']['UTF8filesystem'] = $UTF8filesystem;
 		$this->createDriverFixture()->sanitizeFileName('');
 	}
 

@@ -510,6 +510,10 @@ class BasicFileUtility {
 	public function cleanFileName($fileName, $charset = '') {
 		// Handle UTF-8 characters
 		if ($GLOBALS['TYPO3_CONF_VARS']['SYS']['UTF8filesystem']) {
+
+			$fileName = \TYPO3\CMS\Core\Charset\UnicodeNormalizer::getInstance()
+				->normalizeStringTo($fileName, $GLOBALS['TYPO3_CONF_VARS']['SYS']['UTF8filesystem']);
+
 			// allow ".", "-", 0-9, a-z, A-Z and everything beyond U+C0 (latin capital letter a with grave)
 			$cleanFileName = preg_replace('/[' . self::UNSAFE_FILENAME_CHARACTER_EXPRESSION . ']/u', '_', trim($fileName));
 		} else {
@@ -544,5 +548,4 @@ class BasicFileUtility {
 		// Strip trailing dots and return
 		return preg_replace('/\\.*$/', '', $cleanFileName);
 	}
-
 }

@@ -171,6 +171,22 @@ abstract class AbstractDriver implements DriverInterface {
 	}
 
 	/**
+	 * Returns TRUE if this driver uses unicode-normalized identifiers. NOTE:
+	 * This is a configurable setting, but the setting does not change the way
+	 * the underlying file system treats the identifiers; the setting should
+	 * therefore always reflect the file system and not try to change its
+	 * behaviour
+	 *
+	 * @return boolean
+	 */
+	public function isUnicodeNormalizedFileSystem() {
+		if (isset($this->configuration['unicodeNormalization'])) {
+			return 1 < (int) $this->configuration['unicodeNormalization'];
+		}
+		return FALSE;
+	}
+
+	/**
 	 * Makes sure the path given as parameter is valid
 	 *
 	 * @param string $filePath The file path (most times filePath)

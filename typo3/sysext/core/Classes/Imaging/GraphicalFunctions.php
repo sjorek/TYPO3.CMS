@@ -2646,6 +2646,7 @@ class GraphicalFunctions {
 	 * @return string $inputName escaped as needed
 	 */
 	protected function wrapFileName($inputName) {
+		// TODO Feature #57695: Figure out if we need/want unicode-normalization as well … DONE although incoming paths and filenames on OSX are normalized to NFD (verified via Normalizer::isNormalized), we don't need to touch anything here as the only known combination of PHP on an operating system (OS X) providing NFD-encoded paths, automatically handles unicode-normalization for system-operations. Either in PHP, or I'd bet it's handled by OS.
 		if ($GLOBALS['TYPO3_CONF_VARS']['SYS']['UTF8filesystem']) {
 			$currentLocale = setlocale(LC_CTYPE, 0);
 			setlocale(LC_CTYPE, $GLOBALS['TYPO3_CONF_VARS']['SYS']['systemLocale']);

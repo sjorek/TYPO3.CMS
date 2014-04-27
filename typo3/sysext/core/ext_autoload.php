@@ -11,4 +11,5 @@ return array(
 	'tbe_pagetree' => PATH_typo3 . 'class.browse_links.php',
 	'localpagetree' => PATH_typo3 . 'class.browse_links.php',
 	'transferdata' => PATH_typo3 . 'show_item.php',
+	'Patchwork\\PHP\\Shim\\Normalizer' => PATH_typo3 . 'contrib/Patchwork-UTF8/patchwork/utf8/src/Patchwork/PHP/Shim/Normalizer.php',
 );

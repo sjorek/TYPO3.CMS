@@ -217,6 +217,7 @@ class BackendController {
 		$this->content = $GLOBALS['TBE_TEMPLATE']->render($title, $this->content);
 		$hookConfiguration = array('content' => &$this->content);
 		$this->executeHook('renderPostProcess', $hookConfiguration);
+		// TODO Feature #57695: Figure out if we need/want unicode-normalization as well … OPEN Backend could normalize to NFC like FE does - but then both must use the same normalization, to avoid pitfalls for logged in backend user in FE.
 		echo $this->content;
 	}
 

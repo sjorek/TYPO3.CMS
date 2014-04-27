@@ -1095,6 +1095,42 @@ Will create a link to page with id 29 and add GET parameters where the return UR
 			<default><![CDATA[
 ]]></default>
 		</property>
+		<property name="unicodeNormalization" type="string">
+			<description><![CDATA[Unicode normalization-form of the output page content. Only relevant if ".metaCharset" is utf8.
+
+Unicode-Normalization is a process that involves transforming characters and sequences of characters into a formally-defined underlying representation. The Unicode Consortium has defined a number of normalization forms reflecting the various needs of applications. The different forms are defined in terms of a set of transformations on the text, transformations that are expressed by both an algorithm and a set of data files.
+
+Examples of supported "unicodeNormalization" values:
+- case-insensitive abbreviation strings: D, KD, C, KC, NFC, nfc, FORM_C, formKC, …
+- integers from 0 to 5, which are: 0 = NONE, 1 = AUTO, 2 = NFD, 3 = NFKD, 4 = NFC, 5 = NFKC
+- case-insensitive keywords: none, default, disable(d), compose(d), decompose(d)
+
+Meaning of the "unicodeNormalization" values:
+- 0: No Unicode-Normalization (NONE, disable) - disables any normalization-attempts
+- 1: Default Unicode-Normalization (AUTO, default) - currently it disables any normalization-attempts too, but future implementations may automatically handle the normalization if needed
+- 2: Normalization Form D (NFD, decompose) - canonical decomposition
+- 3: Normalization Form KD (NFKD) - compatibility decomposition
+- 4: Normalization Form C (NFC, compose) - canonical decomposition followed by canonical composition
+- 5: Normalization Form KC (NFKC) - compatibility decomposition followed by canonical composition
+
+Hint: The W3C recommends NFC for HTML5 Output.
+]]></description>
+			<default><![CDATA[0]]></default>
+		</property>
+                <property name="unicodeNormalizeInputs" type="string">
+                        <description><![CDATA[Unicode normalization-form of the given global input arrays () page content. Only relevant if ".metaCharset" is utf8 and ".unicodeNormalization" have been enabled.
+
+A comma-seperated list of global input-arrays as described below, but without leading "$_".
+
+Ensures that "ALL" or the given (user-)inputs ($_FILES, $_ENV, $_GET, $_POST, $_COOKIE, $_SERVER, $_REQUEST) are well-formed and normalized UTF-8 strings.
+
+This implementation has been inspired by the contributed “Patchwork-UTF8” project's “Bootup::filterRequestInputs()”-method and tweaked for our needs.
+
+Hint: The W3C recommends Unicode's Normalization Form C for HTML5 Input.
+]]></description>
+                        <default><![CDATA[
+]]></default>
+                </property>
 		<property name="uniqueLinkVars" type="boolean">
 			<description><![CDATA[It might happen that TYPO3 generates links with the same parameter twice or more. This is no problem because only the last parameter is used, thus the problem is just a cosmetical one.]]></description>
 			<default><![CDATA[0]]></default>

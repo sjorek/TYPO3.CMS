@@ -712,6 +712,7 @@ class GifBuilder extends \TYPO3\CMS\Core\Imaging\GraphicalFunctions {
 			$meaningfulPrefix = implode('_', array_merge($this->combinedTextStrings, $this->combinedFileNames));
 			$meaningfulPrefix = $basicFileFunctions->cleanFileName($meaningfulPrefix);
 			$meaningfulPrefixLength = (int)$GLOBALS['TSFE']->config['config']['meaningfulTempFilePrefix'];
+			// TODO Feature #57695: Figure out if we need/want unicode-normalization as well … FIXED implementation in $basicFileFunctions above
 			if ($GLOBALS['TYPO3_CONF_VARS']['SYS']['UTF8filesystem']) {
 				/** @var $t3libCsInstance \TYPO3\CMS\Core\Charset\CharsetConverter */
 				$t3libCsInstance = GeneralUtility::makeInstance('TYPO3\\CMS\\Core\\Charset\\CharsetConverter');

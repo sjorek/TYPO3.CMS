@@ -82,6 +82,17 @@ interface DriverInterface {
 	public function isCaseSensitiveFileSystem();
 
 	/**
+	 * Returns TRUE if this driver uses unicode-normalized identifiers. NOTE:
+	 * This is a configurable setting, but the setting does not change the way
+	 * the underlying file system treats the identifiers; the setting should
+	 * therefore always reflect the file system and not try to change its
+	 * behaviour
+	 *
+	 * @return boolean
+	 */
+	public function isUnicodeNormalizedFileSystem();
+
+	/**
 	 * Cleans a fileName from not allowed characters
 	 *
 	 * @param string $fileName

@@ -188,6 +188,10 @@ class StorageRepository extends AbstractRepository {
 	 */
 	public function createLocalStorage($name, $basePath, $pathType, $description = '', $default = FALSE) {
 		$caseSensitive = $this->testCaseSensitivity($pathType === 'relative' ? PATH_site . $basePath : $basePath);
+		$unicodeNormalization = isset($GLOBALS['TYPO3_CONF_VARS']['SYS']['UTF8filesystem'])
+			? (int) $GLOBALS['TYPO3_CONF_VARS']['SYS']['UTF8filesystem']
+			: 0;
+
 		// create the FlexForm for the driver configuration
 		$flexFormData = array(
 			'data' => array(
@@ -195,7 +199,8 @@ class StorageRepository extends AbstractRepository {
 					'lDEF' => array(
 						'basePath' => array('vDEF' => rtrim($basePath, '/') . '/'),
 						'pathType' => array('vDEF' => $pathType),
-						'caseSensitive' => array('vDEF' => $caseSensitive)
+						'caseSensitive' => array('vDEF' => $caseSensitive),
+						'unicodeNormalization' => array('vDEF' => $unicodeNormalization)
 					)
 				)
 			)

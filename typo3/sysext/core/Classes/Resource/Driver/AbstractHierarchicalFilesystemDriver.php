@@ -40,6 +40,11 @@ abstract class AbstractHierarchicalFilesystemDriver extends AbstractDriver {
 	protected function canonicalizeAndCheckFilePath($filePath) {
 		$filePath = \TYPO3\CMS\Core\Utility\PathUtility::getCanonicalPath($filePath);
 
+		if ($this->isUnicodeNormalizedFileSystem()) {
+			$filePath = \TYPO3\CMS\Core\Charset\UnicodeNormalizer::getInstance()
+				->normalizeTo($filePath, (int) $this->configuration['unicodeNormalization']);
+		}
+
 		// filePath must be valid
 		// Special case is required by vfsStream in Unit Test context
 		if (!$this->isPathValid($filePath) && substr($filePath, 0, 6) !== 'vfs://') {

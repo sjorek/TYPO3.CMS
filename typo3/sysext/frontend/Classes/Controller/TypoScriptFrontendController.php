@@ -842,6 +842,25 @@ class TypoScriptFrontendController {
 	public $csConvObj;
 
 	/**
+	 * Unicode normalization form.
+	 *
+	 * @var integer|string
+	 * @see \TYPO3\CMS\Core\Charset\UnicodeNormalizer::parseNormalizationForm()
+	 * @todo Define visibility
+	 */
+	public $unicodeNormalization = 0;
+
+	/**
+	 * List of global input arrays like $_GET, $_POST etc..
+	 *
+	 * @var string
+	 * @see \TYPO3\CMS\Core\Charset\UnicodeNormalizer::normalizeInputArrays()
+	 * @see \TYPO3\CMS\Core\Charset\UnicodeNormalizer::filterInputArrays()
+	 * @todo Define visibility
+	 */
+	public $unicodeNormalizeInputs = '';
+
+	/**
 	 * The default charset used in the frontend if nothing else is set.
 	 * @var string
 	 * @todo Define visibility
@@ -4751,12 +4770,12 @@ if (version == "n3") {
 			$convCharset = TRUE;
 		}
 		if ($convCharset) {
-			$email = $this->csConvObj->conv($email, $this->renderCharset, $charset);
-			$subject = $this->csConvObj->conv($subject, $this->renderCharset, $charset);
-			$message = $this->csConvObj->conv($message, $this->renderCharset, $charset);
-			$headers = $this->csConvObj->conv($headers, $this->renderCharset, $charset);
+			$email = $this->csConvObj->conv($email, $this->renderCharset, $charset, 0, $this->unicodeNormalization);
+			$subject = $this->csConvObj->conv($subject, $this->renderCharset, $charset, 0, $this->unicodeNormalization);
+			$message = $this->csConvObj->conv($message, $this->renderCharset, $charset, 0, $this->unicodeNormalization);
+			$headers = $this->csConvObj->conv($headers, $this->renderCharset, $charset, 0, $this->unicodeNormalization);
 		}
-		GeneralUtility::plainMailEncoded($email, $subject, $message, $headers, $encoding, $charset);
+ 		GeneralUtility::plainMailEncoded($email, $subject, $message, $headers, $encoding, $charset);
 	}
 
 	/**
@@ -4898,6 +4917,50 @@ if (version == "n3") {
 		$this->renderCharset = $this->csConvObj->parse_charset($this->config['config']['renderCharset'] ? $this->config['config']['renderCharset'] : 'utf-8');
 		// Rendering charset of HTML page.
 		$this->metaCharset = $this->csConvObj->parse_charset($this->config['config']['metaCharset'] ? $this->config['config']['metaCharset'] : $this->renderCharset);
+
+		if ($this->metaCharset == 'utf-8') {
+			$unicodeNormalization = $this->unicodeNormalization;
+
+			// Unicode normalization of HTML page and possibly global input arrays like $_POST too (see below).
+			if (isset($this->config['config']['unicodeNormalization'])) {
+				$unicodeNormalization = $this->config['config']['unicodeNormalization'];
+			} elseif (isset($this->TYPO3_CONF_VARS['FE']['unicodeNormalization'])) {
+				$unicodeNormalization = $this->TYPO3_CONF_VARS['FE']['unicodeNormalization'];
+			/*
+			// TODO Feature #57695: Using SYS[unicodeNormalization] as fallback in FE would make sence, or not ?
+			// TODO Feature #57695: Different normalizations for SYS (inkl. CLI+BE) and FE could introduce new troubles ?!?
+			} elseif (isset($this->TYPO3_CONF_VARS['SYS']['unicodeNormalization'])) {
+				$unicodeNormalization = $this->TYPO3_CONF_VARS['SYS']['unicodeNormalization'];
+			*/
+			}
+
+			$unicodeNormalization = \TYPO3\CMS\Core\Charset\UnicodeNormalizer::parseNormalizationForm($unicodeNormalization);
+			if ($unicodeNormalization === \TYPO3\CMS\Core\Charset\UnicodeNormalizer::NONE) {
+				// Disable all normalization attempts
+				$this->unicodeNormalization = 0;
+				$this->unicodeNormalizeInputs = '';
+			} else {
+				$this->unicodeNormalization = $unicodeNormalization;
+				// List of global input arrays to unicode-normalize.
+				if (isset($this->config['config']['unicodeNormalizeInputs'])) {
+					$this->unicodeNormalizeInputs = $this->config['config']['unicodeNormalizeInputs'];
+				} elseif (isset($this->TYPO3_CONF_VARS['FE']['unicodeNormalizeInputs'])) {
+					$this->unicodeNormalizeInputs = $this->TYPO3_CONF_VARS['FE']['unicodeNormalizeInputs'];
+				/*
+				// TODO Feature #57695: Using SYS[unicodeNormalizeInputs] as fallback in FE would make sence, or not ?
+				// TODO Feature #57695: Different lists of input-array normalizations for SYS (inkl. CLI+BE) and FE could introduce new troubles ?!?
+				// TODO Feature #57695: Do we want to implement SYS[unicodeNormalizeInputs] in TYPO3 bootstrap ?
+				} elseif (isset($this->TYPO3_CONF_VARS['SYS']['unicodeNormalizeInputs'])) {
+					$this->unicodeNormalization = $this->TYPO3_CONF_VARS['SYS']['unicodeNormalization'];
+				*/
+				}
+			}
+
+		} else {
+			// Disable all normalization attempts
+			$this->unicodeNormalization = 0;
+			$this->unicodeNormalizeInputs = '';
+		}
 	}
 
 	/**
@@ -4922,7 +4985,8 @@ if (version == "n3") {
 	}
 
 	/**
-	 * Converts input string from renderCharset to metaCharset IF the two charsets are different.
+	 * Converts input string from renderCharset to metaCharset IF the two charsets are different. If enabled by configuration
+	 * the input is unicode-normalized if needed.
 	 *
 	 * @param string $content Content to be converted.
 	 * @param string $label Label (just for fun, no function)
@@ -4931,18 +4995,32 @@ if (version == "n3") {
 	 */
 	public function convOutputCharset($content, $label = '') {
 		if ($this->renderCharset != $this->metaCharset) {
-			$content = $this->csConvObj->conv($content, $this->renderCharset, $this->metaCharset, TRUE);
+			$content = $this->csConvObj->conv($content, $this->renderCharset, $this->metaCharset, TRUE, $this->unicodeNormalization);
 		}
 		return $content;
 	}
 
 	/**
 	 * Converts the $_POST array from metaCharset (page HTML charset from input form) to renderCharset (internal processing) IF the two charsets are different.
+	 * Initially the $_POST array gets unicode-normalized, if metaCharset is utf8 and the unicode-normalization is enabled for inputs by configuration.
 	 *
 	 * @return void
 	 */
 	public function convPOSTCharset() {
+		if ($this->unicodeNormalizeInputs && $this->unicodeNormalization) {
+			// TODO Feature #57695: Is UnicodeNormalizer::normalizeInputArrays too weak … is the better approach below ?
+			\TYPO3\CMS\Core\Charset\UnicodeNormalizer::getInstance()
+				->normalizeInputArraysTo($this->unicodeNormalizeInputs, $this->unicodeNormalization);
+
+			// Possibly more safe alternative to normalization-only attempt from above.
+			// I guess it's sometimes more expensive, often not. Has some open todo to check !
+			// $unicodeNormalizer->filterInputArrays($this->unicodeNormalizeInputs);
+		}
+		if (!is_array($_POST) || empty($_POST)) {
+			return ;
+		}
 		if ($this->renderCharset != $this->metaCharset && is_array($_POST) && count($_POST)) {
+			// TODO Feature #57695: Why do we only convert $_POST charset ?!? Why not $_FILES, $_ENV, $_GET, $_POST, $_COOKIE, $_SERVER & $_REQUEST ?
 			$this->csConvObj->convArray($_POST, $this->metaCharset, $this->renderCharset);
 			$GLOBALS['HTTP_POST_VARS'] = $_POST;
 		}

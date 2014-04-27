@@ -17,3 +17,9 @@ if (TYPO3_MODE === 'FE' && !isset($_REQUEST['eID'])) {
 	options.saveDocNew.sys_file_metadata = 0
 	options.disableDelete.sys_file = 1
 ');
+
+if ($GLOBALS['TYPO3_CONF_VARS']['FE']['redirectToUtf8EncodedRequestUriIfNeeded']) {
+	// Register hook to redirect to unicode-nomalized request-uri if needed
+	$GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['tslib/class.tslib_fe.php']['checkAlternativeIdMethods-PostProc'][] = 'TYPO3\\CMS\\Frontend\\Hooks\\UnicodeNormalizationHooks->hook_redirectRequestUriIfNeeded';
+}
+

@@ -45,6 +45,33 @@
 					</config>
 				</TCEforms>
 			</caseSensitive>
+			<unicodeNormalization>
+				<TCEforms>
+					<label>LLL:EXT:lang/locallang_mod_file_list.xlf:localDriverFlexform_unicodeNormalization</label>
+					<config>
+						<type>radio</type>
+						<items type="array">
+							<numIndex index="0" type="array">
+								<numIndex index="0">LLL:EXT:lang/locallang_mod_file_list.xlf:localDriverFlexform_unicodeNormalization_disabled</numIndex>
+								<numIndex index="1">0</numIndex>
+							</numIndex>
+							<numIndex index="1" type="array">
+								<numIndex index="0">LLL:EXT:lang/locallang_mod_file_list.xlf:localDriverFlexform_unicodeNormalization_none</numIndex>
+								<numIndex index="1">1</numIndex>
+							</numIndex>
+							<numIndex index="2" type="array">
+								<numIndex index="0">LLL:EXT:lang/locallang_mod_file_list.xlf:localDriverFlexform_unicodeNormalization_nfc</numIndex>
+								<numIndex index="1">4</numIndex>
+							</numIndex>
+							<numIndex index="3" type="array">
+								<numIndex index="0">LLL:EXT:lang/locallang_mod_file_list.xlf:localDriverFlexform_unicodeNormalization_nfd</numIndex>
+								<numIndex index="1">2</numIndex>
+							</numIndex>
+						</items>
+						<default>0</default>
+					</config>
+				</TCEforms>
+			</unicodeNormalization>
 		</el>
 	</ROOT>
 </T3DataStructure>

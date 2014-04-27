@@ -1054,7 +1054,52 @@ class Check {
 
 				if (escapeshellarg($testString) === $quote . $testString . $quote) {
 					$status = new Status\OkStatus();
-					$status->setTitle('File names with UTF-8 characters can be used.');
+					$title = 'File names with UTF-8 characters can be used';
+					$message = 'The filesystem unicode-normalization handling is disabled.';
+					$normalizationForm = $GLOBALS['TYPO3_CONF_VARS']['SYS']['UTF8filesystem'];
+
+					if (empty($GLOBALS['TYPO3_CONF_VARS']['SYS']['unicodeNormalizer'])) {
+						$status = new Status\WarningStatus();
+					} else {
+						$message = 'The filesystem uses custom unicode-normalization form :' . $normalizationForm;
+						$normalizationForm = (int) $normalizationForm;
+						switch((int) $normalizationForm) {
+							case 1:
+								$message = 'The filesystem ignores unicode-normalization.';
+								break;
+							case 2:
+								$message = 'The filesystem uses unicode-normalization NFD.';
+								break;
+							case 3:
+								$message = 'The filesystem uses unicode-normalization NFKD.';
+								break;
+							case 4:
+								$message = 'The filesystem uses unicode-normalization NFC.';
+								break;
+							case 5:
+								$message = 'The filesystem uses unicode-normalization NFKC.';
+								break;
+						}
+
+						// This is the dumb assumption that every mac runs on HFS+ filesystem with NFD unicode-normalized paths.
+						list($expectedNormalization, $normalizationName) = $this->isMacOsX()
+						    ? array(4, 'NFD')
+						    : array(2, 'NFC');
+
+						if (1 === $normalizationForm) {
+							$message .= ' To identify misbehaviour, it could be a good idea to normalize' .
+							            'FAL\'s file identifiers to '.$normalizationName.'.';
+						} else if (1 < $normalizationForm && $expectedNormalization !== $normalizationForm) {
+							$status = new Status\WarningStatus();
+							$message .= ' Unexpected unicode-normalization detected, we suggest: ' . $normalizationName . '.' .
+							            'TYPO3 expects normalization-form NFD on Apple\'s HFS+ filesystems and ' .
+							            'suggests normalization-form NFC on all other (utf8-capable) filesytems.';
+						}
+					}
+
+					$status->setTitle($title);
+					$status->setMessage($message);
+
 				} else {
 					$status = new Status\ErrorStatus();
 					$status->setTitle('System locale setting doesn\'t support UTF-8 file names.');
@@ -1423,6 +1468,15 @@ class Check {
 			$windowsOs = TRUE;
 		}
 		return $windowsOs;
+	}
+
+	/**
+	 * Test if this instance runs on Mac OSX
+	 *
+	 * @return boolean TRUE if operating system is windows
+	 */
+	protected function isMacOsX() {
+		return FALSE === stristr(PHP_OS, 'darwin');
 	}
 
 	/**

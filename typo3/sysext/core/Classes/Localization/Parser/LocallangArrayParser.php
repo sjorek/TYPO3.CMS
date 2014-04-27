@@ -132,12 +132,14 @@ class LocallangArrayParser implements \TYPO3\CMS\Core\Localization\Parser\Locali
 		// This needs to be done for a few accented loan words and extension names
 		if (is_array($LOCAL_LANG['default']) && $this->targetCharset !== 'utf-8') {
 			foreach ($LOCAL_LANG['default'] as &$labelValue) {
+				// TODO Feature #57695: Figure out if we need/want unicode-normalization as well … DONE Not really needed !
 				$labelValue = $this->csConvObj->conv($labelValue, 'utf-8', $this->targetCharset);
 			}
 			unset($labelValue);
 		}
 		if ($languageKey !== 'default' && is_array($LOCAL_LANG[$languageKey]) && $this->sourceCharset != $this->targetCharset) {
 			foreach ($LOCAL_LANG[$languageKey] as &$labelValue) {
+				// TODO Feature #57695: Figure out if we need/want unicode-normalization as well … DONE Not really needed !
 				$labelValue = $this->csConvObj->conv($labelValue, $this->sourceCharset, $this->targetCharset);
 			}
 			unset($labelValue);

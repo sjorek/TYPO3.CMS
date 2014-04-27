@@ -186,6 +186,7 @@ abstract class AbstractFunctionModule {
 		$this->pObj = $pObj;
 		// Path of this script:
 		$reflector = new \ReflectionObject($this);
+		// TODO Feature #57695: Figure out if we need/want unicode-normalization as well … DONE although incoming paths and filenames on OSX are normalized to NFD (verified via Normalizer::isNormalized), we don't need to touch anything here as copying process itself produces always the same result - no matter which normalization we choose.
 		$this->thisPath = dirname($reflector->getFilename());
 		if (!@is_dir($this->thisPath)) {
 			throw new \RuntimeException('TYPO3 Fatal Error: Could not find path for class ' . get_class($this), 1381164687);

@@ -348,6 +348,15 @@ class ResourceStorage implements ResourceStorageInterface {
 	}
 
 	/**
+	 * Returns TRUE if the identifiers used by this storage are unicode-normalized.
+	 *
+	 * @return bool
+	 */
+	public function usesUnicodeNormalizedIdentifiers() {
+		return $this->driver->isUnicodeNormalizedFileSystem();
+	}
+
+	/**
 	 * Returns TRUE if this storage is browsable by a (backend) user of TYPO3.
 	 *
 	 * @return bool

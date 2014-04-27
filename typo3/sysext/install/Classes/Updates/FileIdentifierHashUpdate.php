@@ -71,7 +71,7 @@ class FileIdentifierHashUpdate extends AbstractUpdate {
 	 * @return boolean TRUE if an update is needed, FALSE otherwise
 	 */
 	public function checkForUpdate(&$description) {
-		$description = 'Add file identifier hash to sys_file records, where it is missing. Additionally upgrade storage configurations.';
+		$description = 'Add file identifier hash to sys_file records, where it is missing or differences in unicode normalization are detected. Additionally upgrade storage configurations.';
 		$unhashedFileCount = $this->db->exec_SELECTcountRows(
 			'uid',
 			'sys_file',
@@ -81,7 +81,17 @@ class FileIdentifierHashUpdate extends AbstractUpdate {
 		$unmigratedStorageCount = $this->db->exec_SELECTcountRows(
 			'uid',
 			'sys_file_storage',
-			'driver = ' . $this->db->fullQuoteStr('Local', 'sys_file_storage') . ' AND configuration NOT LIKE ' . $this->db->fullQuoteStr('%caseSensitive%', 'sys_file_storage')
+			'driver = ' . $this->db->fullQuoteStr('Local', 'sys_file_storage') . ' AND ( configuration NOT LIKE ' . $this->db->fullQuoteStr('%caseSensitive%', 'sys_file_storage') . ' OR configuration NOT LIKE ' . $this->db->fullQuoteStr('%unicodeNormalization%', 'sys_file_storage') . ' )'
+		);
+
+		$unicodeNormalization = isset($GLOBALS['TYPO3_CONF_VARS']['SYS']['UTF8filesystem'])
+			? (int) $GLOBALS['TYPO3_CONF_VARS']['SYS']['UTF8filesystem']
+			: 0;
+
+		$unmigratedStorageCount += $this->db->exec_SELECTcountRows(
+			'uid',
+			'sys_file_storage',
+			'driver = ' . $this->db->fullQuoteStr('Local', 'sys_file_storage') . ' AND configuration LIKE ' . $this->db->fullQuoteStr('%<unicodeNormalization>%</unicodeNormalization>%', 'sys_file_storage') . ' AND configuration NOT LIKE ' . $this->db->fullQuoteStr('%<unicodeNormalization>' . $unicodeNormalization . '</unicodeNormalization>%', 'sys_file_storage')
 		);
 
 		return $unhashedFileCount > 0 || $unmigratedStorageCount > 0;
@@ -110,12 +120,23 @@ class FileIdentifierHashUpdate extends AbstractUpdate {
 	 * @return array
 	 */
 	protected function migrateStorages() {
+
+		$unicodeNormalization = isset($GLOBALS['TYPO3_CONF_VARS']['SYS']['UTF8filesystem'])
+			? (int) $GLOBALS['TYPO3_CONF_VARS']['SYS']['UTF8filesystem']
+			: 0;
+
 		$dbQueries = array();
 		$unmigratedStorages = $this->db->exec_SELECTgetRows(
 			'uid, configuration',
 			'sys_file_storage',
-			'driver = ' . $this->db->fullQuoteStr('Local', 'sys_file_storage') . ' AND configuration NOT LIKE ' . $this->db->fullQuoteStr('%caseSensitive%', 'sys_file_storage')
+			'driver = ' . $this->db->fullQuoteStr('Local', 'sys_file_storage') . ' AND ( configuration NOT LIKE ' . $this->db->fullQuoteStr('%caseSensitive%', 'sys_file_storage') . ' OR configuration NOT LIKE ' . $this->db->fullQuoteStr('%unicodeNormalization%', 'sys_file_storage') . ' )'
 		);
+
+		$unmigratedStorages = array_merge($unmigratedStorages, $this->db->exec_SELECTgetRows(
+				'uid, configuration',
+				'sys_file_storage',
+				'driver = ' . $this->db->fullQuoteStr('Local', 'sys_file_storage') . ' AND configuration LIKE ' . $this->db->fullQuoteStr('%<unicodeNormalization>%</unicodeNormalization>%', 'sys_file_storage') . ' AND configuration NOT LIKE ' . $this->db->fullQuoteStr('%<unicodeNormalization>' . $unicodeNormalization . '</unicodeNormalization>%', 'sys_file_storage')
+		));
 
 		/** @var $flexObj \TYPO3\CMS\Core\Configuration\FlexForm\FlexFormTools */
 		$flexObj = \TYPO3\CMS\Core\Utility\GeneralUtility::makeInstance('TYPO3\\CMS\\Core\\Configuration\\FlexForm\\FlexFormTools');
@@ -125,12 +146,30 @@ class FileIdentifierHashUpdate extends AbstractUpdate {
 			$flexFormXml = $storage['configuration'];
 			$configurationArray = \TYPO3\CMS\Core\Utility\GeneralUtility::xml2array($flexFormXml);
 
-			$caseSensitive = $this->testCaseSensitivity(
-				$configurationArray['data']['sDEF']['lDEF']['pathType']['vDEF'] == 'relative' ?
-					PATH_site . $configurationArray['data']['sDEF']['lDEF']['basePath']['vDEF'] :
-					$configurationArray['data']['sDEF']['lDEF']['basePath']['vDEF']
-			);
-			$configurationArray['data']['sDEF']['lDEF']['caseSensitive'] = array('vDEF' => $caseSensitive);
+			if (!isset($configurationArray['data']['sDEF']['lDEF']['caseSensitive'])) {
+				$caseSensitive = $this->testCaseSensitivity(
+					$configurationArray['data']['sDEF']['lDEF']['pathType']['vDEF'] == 'relative' ?
+						PATH_site . $configurationArray['data']['sDEF']['lDEF']['basePath']['vDEF'] :
+						$configurationArray['data']['sDEF']['lDEF']['basePath']['vDEF']
+				);
+				$configurationArray['data']['sDEF']['lDEF']['caseSensitive'] = array('vDEF' => $caseSensitive);
+			}
+
+			if (isset($configurationArray['data']['sDEF']['lDEF']['unicodeNormalization'])) {
+				$currentNormalization = (int) $configurationArray['data']['sDEF']['lDEF']['unicodeNormalization'];
+				if ($currentNormalization !== $unicodeNormalization) {
+					// a re-hash of all file identifiers is needed !
+					$queries[] = $query = $this->db->UPDATEquery(
+						'sys_file',
+						sprintf('storage=%d', (int) $storage['uid']),
+						array(
+							'identifier_hash' => '',
+						)
+					);
+					$this->db->sql_query($query);
+				}
+			}
+			$configurationArray['data']['sDEF']['lDEF']['unicodeNormalization'] = array('vDEF' => $unicodeNormalization);
 
 			$configuration = $flexObj->flexArray2Xml($configurationArray);
 			$dbQueries[] = $query = $this->db->UPDATEquery(
@@ -154,9 +193,9 @@ class FileIdentifierHashUpdate extends AbstractUpdate {
 	protected function updateIdentifierHashesForStorage(ResourceStorage $storage) {
 		$queries = array();
 
-		if (!ExtensionManagementUtility::isLoaded('dbal')) {
-			// if DBAL is not loaded, we're using MySQL and can thus use their
-			// SHA1() function
+		if (!ExtensionManagementUtility::isLoaded('dbal') && !$storage->usesUnicodeNormalizedIdentifiers()) {
+			// if DBAL is not loaded, we're using MySQL and can thus use their SHA1() function
+			// TODO Feature #57695: The assumption above seems to be wrong if the filesystem's unicode normalization differs from the indendifier field in database !
 			if ($storage->usesCaseSensitiveIdentifiers()) {
 				$updateCall = 'SHA1(identifier)';
 			} else {
@@ -188,9 +227,9 @@ class FileIdentifierHashUpdate extends AbstractUpdate {
 				$this->db->sql_query($query);
 			}
 		} else {
-			// manually hash the identifiers when using DBAL
+			// manually hash the identifiers when using DBAL or when Unicode Normalization is required
 			$files = $this->db->exec_SELECTgetRows('uid, storage, identifier', 'sys_file',
-				sprintf('storage=%d AND identifier_hash=""', $storage->getUid())
+				sprintf('storage=%d AND ( identifier_hash="" OR folder_hash="" )', $storage->getUid())
 			);
 
 			foreach ($files as $file) {
