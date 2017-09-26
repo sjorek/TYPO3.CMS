@@ -42,6 +42,37 @@
 					</config>
 				</TCEforms>
 			</caseSensitive>
+			<UTF8filesystem>
+				<TCEforms>
+					<label>LLL:EXT:filelist/Resources/Private/Language/locallang_mod_file_list.xlf:localDriverFlexform_utf8filesystem</label>
+					<config>
+						<type>radio</type>
+						<items type="array">
+							<numIndex index="0" type="array">
+								<numIndex index="0">LLL:EXT:filelist/Resources/Private/Language/locallang_mod_file_list.xlf:localDriverFlexform_utf8filesystem_na</numIndex>
+								<numIndex index="1">0</numIndex>
+							</numIndex>
+							<numIndex index="1" type="array">
+								<numIndex index="0">LLL:EXT:filelist/Resources/Private/Language/locallang_mod_file_list.xlf:localDriverFlexform_utf8filesystem_none</numIndex>
+								<numIndex index="1">1</numIndex>
+							</numIndex>
+							<numIndex index="2" type="array">
+								<numIndex index="0">LLL:EXT:filelist/Resources/Private/Language/locallang_mod_file_list.xlf:localDriverFlexform_utf8filesystem_nfc</numIndex>
+								<numIndex index="1">4</numIndex>
+							</numIndex>
+							<numIndex index="3" type="array">
+								<numIndex index="0">LLL:EXT:filelist/Resources/Private/Language/locallang_mod_file_list.xlf:localDriverFlexform_utf8filesystem_nfd</numIndex>
+								<numIndex index="1">2</numIndex>
+							</numIndex>
+							<numIndex index="4" type="array">
+								<numIndex index="0">LLL:EXT:filelist/Resources/Private/Language/locallang_mod_file_list.xlf:localDriverFlexform_utf8filesystem_nfd_mac</numIndex>
+								<numIndex index="1">32</numIndex>
+							</numIndex>
+						</items>
+						<default>0</default>
+					</config>
+				</TCEforms>
+			</UTF8filesystem>
 		</el>
 	</ROOT>
 </T3DataStructure>

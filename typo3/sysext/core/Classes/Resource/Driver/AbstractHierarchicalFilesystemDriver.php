@@ -15,6 +15,7 @@ namespace TYPO3\CMS\Core\Resource\Driver;
  */
 
 use TYPO3\CMS\Core\Charset\CharsetConverter;
+use TYPO3\CMS\Core\Charset\UnicodeNormalizer;
 use TYPO3\CMS\Core\Resource\Exception\InvalidPathException;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\CMS\Core\Utility\PathUtility;
@@ -64,6 +65,13 @@ abstract class AbstractHierarchicalFilesystemDriver extends AbstractDriver
     protected function canonicalizeAndCheckFilePath($filePath)
     {
         $filePath = PathUtility::getCanonicalPath($filePath);
+
+        if (UnicodeNormalizer::NONE < $this->getUtf8FileSystemMode()) {
+            $charsetConverter = $this->getCharsetConversion();
+            $filePath = $charsetConverter->conv(
+                $filePath, 'utf-8', 'utf-8', false, $this->getUtf8FileSystemMode()
+            );
+        }
 
         // filePath must be valid
         // Special case is required by vfsStream in Unit Test context

@@ -80,6 +80,7 @@ class JsonResponse extends Response
      */
     public function setPayload(array $data = [], $encodingOptions = self::DEFAULT_JSON_FLAGS): JsonResponse
     {
+        // TODO Feature #57695: Figure out if we need or want to apply unicode-normalization in JsonResponse
         $this->body->write($this->jsonEncode($data, $encodingOptions));
         $this->body->rewind();
         return $this;

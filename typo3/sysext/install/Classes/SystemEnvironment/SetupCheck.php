@@ -14,10 +14,12 @@ namespace TYPO3\CMS\Install\SystemEnvironment;
  * The TYPO3 project - inspiring people to share!
  */
 
+use TYPO3\CMS\Core\Charset\UnicodeNormalizer;
 use TYPO3\CMS\Core\Messaging\FlashMessage;
 use TYPO3\CMS\Core\Messaging\FlashMessageQueue;
 use TYPO3\CMS\Core\Service\OpcodeCacheService;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
+use TYPO3\CMS\Core\Utility\UnicodeUtility;
 
 /**
  * Check TYPO3 setup status
@@ -48,6 +50,7 @@ class SetupCheck implements CheckInterface
         $this->checkDownloadsPossible();
         $this->checkSystemLocale();
         $this->checkLocaleWithUTF8filesystem();
+        $this->checkUnicodeNormalizationWithUTF8Charset();
         $this->checkSomePhpOpcodeCacheIsLoaded();
         $this->isTrueTypeFontWorking();
         $this->checkLibXmlBug();
@@ -145,25 +148,138 @@ class SetupCheck implements CheckInterface
      */
     protected function checkLocaleWithUTF8filesystem()
     {
-        if ($GLOBALS['TYPO3_CONF_VARS']['SYS']['UTF8filesystem']) {
-            // On Windows an empty local value uses the regional settings from the Control Panel
+        $UTF8filesystem = (int) $GLOBALS['TYPO3_CONF_VARS']['SYS']['UTF8filesystem'];
+        if ($UTF8filesystem) {
+            // On Windows an empty locale value uses the regional settings from the Control Panel
             if ($GLOBALS['TYPO3_CONF_VARS']['SYS']['systemLocale'] === '' && TYPO3_OS !== 'WIN') {
                 $this->messageQueue->enqueue(new FlashMessage(
-                    '$GLOBALS[TYPO3_CONF_VARS][SYS][UTF8filesystem] is set, but $GLOBALS[TYPO3_CONF_VARS][SYS][systemLocale]'
-                        . ' is empty. Make sure a valid locale which supports UTF-8 is set.',
+                    '$GLOBALS[TYPO3_CONF_VARS][SYS][UTF8filesystem] is enabled, but '
+                        . '$GLOBALS[TYPO3_CONF_VARS][SYS][systemLocale] is empty. Make '
+                        . 'sure a valid locale which supports UTF-8 is set.',
                     'System locale not set on UTF-8 file system',
                     FlashMessage::ERROR
                 ));
+            } else  if (UnicodeNormalizer::NONE < $UTF8filesystem && 
+                        in_array(UnicodeNormalizer::IMPLEMENTATION_IDENTIFIER, ['stub', 'missing'], true))
+            {
+                $this->messageQueue->enqueue(new FlashMessage(
+                    '$GLOBALS[TYPO3_CONF_VARS][SYS][UTF8filesystem] is enabled to use unicode-normalized '
+                        . 'identifiers. Please install/configure a proper normalization implementation in '
+                        . '$GLOBALS[TYPO3_CONF_VARS][SYS][unicode][normalizer] or disable '
+                        . 'unicode-normalization in $GLOBALS[TYPO3_CONF_VARS][SYS][UTF8filesystem].',
+                    'Invalid configuration for UTF-8 file system',
+                    FlashMessage::ERROR
+                ));
+            } else  if (!in_array($UTF8filesystem, UnicodeNormalizer::UNICODE_NORMALIZATION_FORMS, true)) {
+                $this->messageQueue->enqueue(new FlashMessage(
+                    '$GLOBALS[TYPO3_CONF_VARS][SYS][UTF8filesystem] is set, but contains an invalid value.'
+                        . 'Valid and supported values are: '
+                        . implode(
+                            ', ',
+                            array_merge([0],
+                                // strip NFKD and NFKC from list of supported values
+                                array_intersect(
+                                    [UnicodeNormalizer::NONE, UnicodeNormalizer::NFC, UnicodeNormalizer::NFD],
+                                    UnicodeNormalizer::UNICODE_NORMALIZATION_FORMS
+                                )
+                            )
+                        ) . '. '
+                        . 'Hint: The valid values are defined by the unicode-normalizer implementation '
+                        . 'configured in $GLOBALS[TYPO3_CONF_VARS][SYS][unicode][normalizer].',
+                    'Invalid configuration for UTF-8 file system',
+                    FlashMessage::ERROR
+                ));
             } else {
-                $testString = 'ÖöĄĆŻĘĆćążąęó.jpg';
+
                 $currentLocale = setlocale(LC_CTYPE, 0);
-                $quote = TYPO3_OS === 'WIN' ? '"' : '\'';
                 setlocale(LC_CTYPE, $GLOBALS['TYPO3_CONF_VARS']['SYS']['systemLocale']);
-                if (escapeshellarg($testString) === $quote . $testString . $quote) {
-                    $this->messageQueue->enqueue(new FlashMessage(
-                        '',
-                        'File names with UTF-8 characters can be used.'
-                    ));
+                $capabilities = UnicodeUtility::detectUtf8CapabilitiesForPath(PATH_site . '/typo3temp');
+                setlocale(LC_CTYPE, $currentLocale);
+
+                if ($capabilities['locale'] === true && $capabilities['shellescape'] === true) {
+
+                    $message = 'The utf8-filesystem is configured to ';
+                    switch ((int) $UTF8filesystem) {
+                        case UnicodeNormalizer::NONE:
+                            $message .= 'ignore unicode-normalization (NONE) ';
+                            break;
+                        case UnicodeNormalizer::NFD:
+                            $normalizationName = 'NFD';
+                            $message .= 'use decomposed unicode normalization (NFD) ';
+                            break;
+                        case UnicodeNormalizer::NFC:
+                            $normalizationName = 'NFC';
+                            $message .= 'use re-composed unicode normalization (NFC) ';
+                            break;
+                    }
+                    $message .= 'for file names.';
+
+                    // If it is not a mac - this is a stupid assumption that every Darwin is a Mac!
+                    if (false === stripos(PHP_OS, 'Darwin')) {
+                        $expectedForm = UnicodeNormalizer::NFC;
+                        $expectedName = 'NFC';
+                    } else {
+                        /**
+                         * Warning: This is the stupid assumption that every Mac and runs on
+                         * a HFS+ filesystem (MacOS Extended) with NFD(-alike) normalization.
+                         * This might not be true, due to NFS mounts or the like!
+                         * 
+                         * @todo Feature #57695 What about Apple™'s new normalization-insensitive APFS?
+                         * @link https://developer.apple.com/library/content/documentation/FileManagement/Conceptual/APFS_Guide/FAQ/FAQ.html#//apple_ref/doc/uid/TP40016999-CH6-DontLinkElementID_3
+                         * @see \TYPO3\CMS\Core\Charset\Unicode\NormalizerInterface::NFD
+                         */
+                        $expectedForm = UnicodeNormalizer::NFD_MAC;
+                        $expectedName = 'NFD_MAC';
+                    }
+
+                    $hint = sprintf(
+                        'Hint: If you move your typo3 installation between different operating- and filesystems,'
+                            . ' it could be a good idea to normalize FAL\'s file identifiers to %s by setting'
+                            . ' $GLOBALS[TYPO3_CONF_VARS][SYS][UTF8filesystem] to %s. After normalization via '
+                            . ' the install-tool set the value back to %s.',
+                        $expectedForm,
+                        $expectedName,
+                        UnicodeNormalizer::NONE
+                    );
+
+                    if (UnicodeNormalizer::NONE === $UTF8filesystem) {
+                        $this->messageQueue->enqueue(new FlashMessage(
+                            $message . LF . $hint,
+                            'File names with UTF-8 characters can be used.'
+                        ));
+                    } elseif ($capabilities[$UTF8filesystem] !== true) {
+                        $message .= LF . sprintf(
+                            'The utf8-filesystem lacks support for %s unicode-normalization on file names. '
+                                . 'We support decomposed normalization-form (NFD) on Apple\'s HFS+ filesystem, '
+                                . 'but suggest re-composed normalization-form (NFC) on utf8-filesystems in '
+                                . 'general. '
+                                . LF . 'Set $GLOBALS[TYPO3_CONF_VARS][SYS][UTF8filesystem] to 1 (NONE).',
+                            $normalizationName
+                        );
+                        $this->messageQueue->enqueue(new FlashMessage(
+                            $message . LF . $hint,
+                            'File names with UTF-8 characters use unsupported unicode-normalization.',
+                            FlashMessage::ERROR
+                        ));
+                    } elseif ($UTF8filesystem !== $expectedForm) {
+                        $message .= sprintf(
+                            'Detected an unexpected unicode-normalization. We suggest %s unicode-normalization. '
+                                . 'We expect decomposed normalization-form (NFD) on Apple\'s HFS+ filesystems '
+                                . 'and suggest re-composed normalization-form (NFC) on all other utf8-filesytems. '
+                                . LF . 'Try setting $GLOBALS[TYPO3_CONF_VARS][SYS][UTF8filesystem] to %s.',
+                            $normalizationName, $expectedName, $expectedForm
+                        );
+                        $this->messageQueue->enqueue(new FlashMessage(
+                            $message . LF . $hint,
+                            'File names with UTF-8 characters use unexpected unicode-normalization.',
+                            FlashMessage::NOTICE
+                         ));
+                    } else {
+                        $this->messageQueue->enqueue(new FlashMessage(
+                            $message . LF . $hint,
+                            'File names with UTF-8 characters can be used.'
+                        ));
+                    }
                 } else {
                     $this->messageQueue->enqueue(new FlashMessage(
                         'Please check your $GLOBALS[TYPO3_CONF_VARS][SYS][systemLocale] setting.',
@@ -171,12 +287,132 @@ class SetupCheck implements CheckInterface
                         FlashMessage::ERROR
                     ));
                 }
-                setlocale(LC_CTYPE, $currentLocale);
             }
         } else {
             $this->messageQueue->enqueue(new FlashMessage(
                 '',
                 'Skipping test, as UTF8filesystem is not enabled.'
+            ));
+        }
+    }
+
+    /**
+     * Checks whether we can use unicode-normalization with UTF-8 characters.
+     */
+    protected function checkUnicodeNormalizationWithUTF8Charset()
+    {
+        $feNormalizationForm = (int) $GLOBALS['TYPO3_CONF_VARS']['FE']['unicode']['normalizationForm'];
+        $sysNormalizationForm = (int) $GLOBALS['TYPO3_CONF_VARS']['SYS']['unicode']['normalizationForm'];
+        
+        if (0 < $feNormalizationForm || 0 < (int) $sysNormalizationForm) {
+
+            $identifier = UnicodeNormalizer::IMPLEMENTATION_IDENTIFIER;
+            $forms = UnicodeNormalizer::UNICODE_NORMALIZATION_FORMS;
+
+            $feOk = in_array((int) $feNormalizationForm, $forms, true);
+            $sysOk = in_array((int) $sysNormalizationForm, $forms, true);
+            if (!$feOk || !$sysOk) {
+                $message = 'An unsupported unicode normalization form is set for ';
+                if (!$feOk) {
+                    $message .= '$GLOBALS[TYPO3_CONF_VARS][FE][unicode][normalizationForm]';
+                }
+                if (!$sysOk) {
+                    if (!$feOk) {
+                        $message .= ' and ';
+                    }
+                    $message .= '$GLOBALS[TYPO3_CONF_VARS][SYS][unicode][normalizationForm]';
+                }
+                $message .= '. Valid and supported values are: '
+                    . implode(', ', array_merge([0],  UnicodeNormalizer::UNICODE_NORMALIZATION_FORMS)) . '. '
+                    . 'Hint: The valid values are defined by the unicode-normalizer implementation '
+                    . 'configured in $GLOBALS[TYPO3_CONF_VARS][SYS][unicode][normalizer].';
+
+                $this->messageQueue->enqueue(new FlashMessage(
+                    $message,
+                    'Unicode normalization support has been turned on, using an unsupported normalization form.',
+                    FlashMessage::ERROR
+                ));
+            } elseif ($identifier === 'missing') {
+                $this->messageQueue->enqueue(new FlashMessage(
+                    'There is no implementation available that implements unicode-normalization. Either configure '
+                        . 'an implementation in $GLOBALS[TYPO3_CONF_VARS][SYS][unicode][normalizer] '
+                        . 'and install its corresponding dependencies or disable normalization by setting '
+                        . '$GLOBALS[TYPO3_CONF_VARS][FE][unicode][normalizationForm] and '
+                        . '$GLOBALS[TYPO3_CONF_VARS][SYS][unicode][normalizationForm] to 0',
+                    'Unicode normalization support has been turned on without any implementation available.',
+                    FlashMessage::ERROR
+                ));
+            } elseif ($identifier === 'stub') {
+                $this->messageQueue->enqueue(new FlashMessage(
+                    'The stub implementation does not implement unicode-normalization. Either configure '
+                        . 'an implementation in $GLOBALS[TYPO3_CONF_VARS][SYS][unicode][normalizer] '
+                        . 'and install its corresponding dependencies or disable normalization by setting '
+                        . '$GLOBALS[TYPO3_CONF_VARS][FE][unicode][normalizationForm] and '
+                        . '$GLOBALS[TYPO3_CONF_VARS][SYS][unicode][normalizationForm] to 0',
+                    'Unicode normalization support has been turned on with a stub implementation.',
+                    FlashMessage::WARNING
+                ));
+            } elseif ($identifier === 'custom') {
+                if (class_exists($GLOBALS['TYPO3_CONF_VARS']['SYS']['unicode']['customNormalizerClass'], true)) {
+                    $message = 'A custom normalizer implementation is provided by .'
+                             . $GLOBALS['TYPO3_CONF_VARS']['SYS']['unicode']['customNormalizerClass'];
+                    $severity = FlashMessage::NOTICE;
+                } else {
+                    $message = 'The custom normalizer implementation "'
+                             . $GLOBALS['TYPO3_CONF_VARS']['SYS']['unicode']['customNormalizerClass']
+                             . '" has not been found.';
+                    $severity = FlashMessage::ERROR;
+                }
+                $this->messageQueue->enqueue(new FlashMessage(
+                    $message,
+                    'Unicode normalization support has been turned on with a custom implementation.',
+                    $severity
+                ));
+            } elseif ($identifier === 'intl') {
+                $this->messageQueue->enqueue(new FlashMessage(
+                    'A native normalizer implementation is provided by "intl"-extension.',
+                    'Unicode normalization support has been turned on.'
+                ));
+            } elseif ($identifier === 'patchwork') {
+                $this->messageQueue->enqueue(new FlashMessage(
+                    'A pure-php normalizer implementation is provided by "patchwork/utf8" package. '
+                        . 'Try installing the "intl"-extension, which provides a superior native implementation.',
+                    'Unicode normalization support has been turned on.',
+                    FlashMessage::NOTICE
+                ));
+            } elseif ($identifier === 'symfony') {
+                $this->messageQueue->enqueue(new FlashMessage(
+                    'A pure-php normalizer implementation is provided by "symfony/polyfill-intl-normalizer" '
+                    . 'package. Try installing the "intl"-extension, which provides a superior native '
+                    . 'implementation.',
+                    'Unicode normalization support has been turned on.',
+                    FlashMessage::NOTICE
+                ));
+            } elseif ($identifier === 'mac') {
+                $this->messageQueue->enqueue(new FlashMessage(
+                    'A normalizer implementation is provided by TYPO3 utilizing the native "iconv"-extension '
+                        . 'plus one of the other implementations. Besides all standard normalization forms this '
+                        . 'implementation provides a special NFD_MAC normalization form for use on Apple™\'s '
+                        . 'HFS+ filesystem (OS X Extended). Install the "intl"-extension, to enhance this '
+                        . 'implementation with a superior native implementation.',
+                    'Unicode normalization support has been turned on.',
+                    FlashMessage::NOTICE
+                ));
+            } else {
+                $this->messageQueue->enqueue(new FlashMessage(
+                    'None of the supported unicode-normalization implementations have been found. Install one of '
+                        . 'the supported solutions or disable unicode-normalization at all by setting '
+                        . '$GLOBALS[TYPO3_CONF_VARS][FE][unicode][normalizationForm] and '
+                        . '$GLOBALS[TYPO3_CONF_VARS][SYS][unicode][normalizationForm] to 0 as well as '
+                        . '$GLOBALS[TYPO3_CONF_VARS][SYS][UTF8filesystem] to 0 or 1.',
+                    'Unicode normalization support has been turned on, but normalizer implementation is missing.',
+                    FlashMessage::ERROR
+                ));
+            }
+        } else {
+            $this->messageQueue->enqueue(new FlashMessage(
+                '',
+                'Skipping test as unicode normalization support has been turned off.'
             ));
         }
     }

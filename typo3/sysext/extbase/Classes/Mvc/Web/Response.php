@@ -248,6 +248,7 @@ class Response extends \TYPO3\CMS\Extbase\Mvc\Response
     {
         $this->sendHeaders();
         if ($this->content !== null) {
+            // TODO Feature #57695: apply unicode-normalization?
             echo $this->getContent();
         }
     }

@@ -15,6 +15,7 @@ namespace TYPO3\CMS\Core\Resource\Driver;
  */
 
 use TYPO3\CMS\Core\Utility\PathUtility;
+use TYPO3\CMS\Core\Charset\UnicodeNormalizer;
 
 /**
  * An abstract implementation of a storage driver.
@@ -172,6 +173,38 @@ abstract class AbstractDriver implements DriverInterface
             return (bool)$this->configuration['caseSensitive'];
         }
         return true;
+    }
+
+    /**
+     * Returns TRUE if this driver uses utf8 identifiers. NOTE: This
+     * is a configurable setting, but the setting does not change the way the
+     * underlying file system treats the identifiers; the setting should
+     * therefore always reflect the file system and not try to change its
+     * behaviour
+     *
+     * @return bool
+     */
+    public function isUtf8FileSystem()
+    {
+        return 0 < $this->getUtf8FileSystemMode();
+    }
+
+    /**
+     * Returns 0 if the utf8-filesystem is disabled or not available, otherwise
+     * the value of one of the corresponding UnicodeNormalizer constants. NOTE:
+     * This is a configurable setting, but the setting does not change the way
+     * the underlying file system treats the identifiers; the setting should
+     * therefore always reflect the file system and not try to change its
+     * behaviour
+     *
+     * @return integer 0 if disabled or not available, otherwise the value of
+     *                 one of the corresponding UnicodeNormalizer constants. 
+     */
+    public function getUtf8FileSystemMode() {
+        if (isset($this->configuration['UTF8filesystem'])) {
+            return (int)$this->configuration['UTF8filesystem'];
+        }
+        return 0;
     }
 
     /**

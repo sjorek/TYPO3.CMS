@@ -33,6 +33,7 @@ class HtmlResponse extends Response
     public function __construct($content, $status = 200, array $headers = [])
     {
         $body = new Stream('php://temp', 'wb+');
+        // TODO Feature #57695: Figure out if we need or want to apply unicode-normalization in HtmlResponse
         $body->write($content);
         $body->rewind();
         parent::__construct($body, $status, $headers);

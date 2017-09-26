@@ -23,6 +23,7 @@ use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
 use TYPO3\CMS\Core\Cache\CacheManager;
 use TYPO3\CMS\Core\Charset\CharsetConverter;
 use TYPO3\CMS\Core\Charset\UnknownCharsetException;
+use TYPO3\CMS\Core\Charset\UnicodeNormalizer;
 use TYPO3\CMS\Core\Controller\ErrorPageController;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Database\Query\QueryHelper;
@@ -50,6 +51,7 @@ use TYPO3\CMS\Core\Utility\ExtensionManagementUtility;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\CMS\Core\Utility\HttpUtility;
 use TYPO3\CMS\Core\Utility\MathUtility;
+use TYPO3\CMS\Core\Utility\UnicodeUtility;
 use TYPO3\CMS\Frontend\Authentication\FrontendUserAuthentication;
 use TYPO3\CMS\Frontend\ContentObject\ContentObjectRenderer;
 use TYPO3\CMS\Frontend\Http\UrlHandlerInterface;
@@ -689,6 +691,30 @@ class TypoScriptFrontendController implements LoggerAwareInterface
      * @var string
      */
     public $metaCharset = 'utf-8';
+
+    /**
+     * Unicode normalization form.
+     *
+     * @var integer|string
+     * @see \TYPO3\CMS\Core\Utility\UnicodeUtility::parseNormalizationForm()
+     */
+    public $unicodeNormalization = 0;
+
+    /**
+     * 'ALL' or comma-separated list of global input arrays $_GET, $_POST, $_FILES or $_COOKIE without the '$_'
+     *
+     * @var string
+     * @see \TYPO3\CMS\Core\Utility\UnicodeUtility::normalizeInputArrays()
+     */
+    public $unicodeNormalizeInputs = '';
+
+    /**
+     * 'ALL' or comma-separated list of global input arrays $_GET, $_POST, $_FILES or $_COOKIE without the '$_'
+     *
+     * @var string
+     * @see \TYPO3\CMS\Core\Utility\UnicodeUtility::filterInputArrays()
+     */
+    public $unicodeFilterInputs = '';
 
     /**
      * Set to the system language key (used on the site)
@@ -2071,6 +2097,7 @@ class TypoScriptFrontendController implements LoggerAwareInterface
                     }
                 }
                 // Output the content
+                // TODO Feature #57695: apply unicode-normalization?
                 echo $content;
             }
         } else {
@@ -2557,6 +2584,7 @@ class TypoScriptFrontendController implements LoggerAwareInterface
         if (isset($this->config['config']['metaCharset']) && $this->config['config']['metaCharset'] !== 'utf-8') {
             $this->metaCharset = $this->config['config']['metaCharset'];
         }
+        $this->initUnicodeFeatures();
 
         // Get values from TypoScript, if not set before
         if ($this->sys_language_uid === 0) {
@@ -2771,8 +2799,8 @@ class TypoScriptFrontendController implements LoggerAwareInterface
     /**
      * Loops over all registered URL handlers and lets them process the current URL.
      *
-     * If no handler has stopped the current process (e.g. by redirecting) and a
-     * the redirectUrl propert is not empty, the user will be redirected to this URL.
+     * If no handler has stopped the current process (e.g. by redirecting) and the
+     * redirectUrl property is not empty, the user will be redirected to this URL.
      *
      * @internal Should be called by the FrontendRequestHandler only.
      * @return ResponseInterface|null
@@ -4279,19 +4307,67 @@ class TypoScriptFrontendController implements LoggerAwareInterface
     }
 
     /**
+     * Initializing the unicode features.
+     */
+    public function initUnicodeFeatures()
+    {
+        $unicodeNormalization = 0;
+
+        // Allow disabling normalization via intall tool 
+        if (0 < (int) $GLOBALS['TYPO3_CONF_VARS']['FE']['unicode']['normalizationForm']) {
+            $unicodeNormalization = $this->unicodeNormalization;
+            // Unicode normalization of HTML page and possibly global input arrays like $_POST too (see below).
+            if (isset($this->config['config']['unicode']['normalizationForm'])) {
+                $unicodeNormalization = $this->config['config']['unicode']['normalizationForm'];
+            } else {
+                $unicodeNormalization = (int) $GLOBALS['TYPO3_CONF_VARS']['FE']['unicode']['normalizationForm'];
+            }
+        }
+        $unicodeNormalization = UnicodeUtility::parseNormalizationForm($unicodeNormalization);
+
+        if (0 < $unicodeNormalization) {
+            $this->unicodeNormalization = $unicodeNormalization;
+            // List of global input arrays to unicode-normalize.
+            if (isset($this->config['config']['unicode']['normalizeInputs'])) {
+                $this->unicodeNormalizeInputs = $this->config['config']['unicode']['normalizeInputs'];
+            } elseif (isset($GLOBALS['TYPO3_CONF_VARS']['FE']['unicode']['normalizeInputs'])) {
+                $this->unicodeNormalizeInputs = $GLOBALS['TYPO3_CONF_VARS']['FE']['unicode']['normalizeInputs'];
+            }
+        } else {
+            // Disable all normalization attempts
+            $this->unicodeNormalization = 0;
+            $this->unicodeNormalizeInputs = '';
+        }
+
+        if (isset($this->config['config']['unicode']['filterInputs'])) {
+            $this->unicodeFilterInputs = $this->config['config']['unicode']['filterInputs'];
+        } elseif (isset($GLOBALS['TYPO3_CONF_VARS']['FE']['unicode']['filterInputs'])) {
+            $this->unicodeFilterInputs = $GLOBALS['TYPO3_CONF_VARS']['FE']['unicode']['filterInputs'];
+        }
+        if ($this->unicodeFilterInputs && $this->unicodeNormalizeInputs) {
+            $filterInputs = GeneralUtility::trimExplode(',', strtoupper($this->unicodeFilterInputs), true);
+            $normalizeInputs = GeneralUtility::trimExplode(',', strtoupper($this->unicodeNormalizeInputs), true);
+            // Remove all $normalizeInputs elements that are part of $filterInputs
+            $this->unicodeNormalizeInputs = implode(',', array_diff($normalizeInputs, $filterInputs));
+        }
+    }
+
+    /**
      * Converts input string from utf-8 to metaCharset IF the two charsets are different.
-     *
+     * Applies unicode-normalization too, if configured and needed.
+     * 
      * @param string $content Content to be converted.
      * @return string Converted content string.
      * @throws \RuntimeException if an invalid charset was configured
      */
     public function convOutputCharset($content)
     {
-        if ($this->metaCharset !== 'utf-8') {
+        if ($this->metaCharset !== 'utf-8' || UnicodeNormalizer::NONE < $this->unicodeNormalization) {
             /** @var CharsetConverter $charsetConverter */
             $charsetConverter = GeneralUtility::makeInstance(CharsetConverter::class);
             try {
                 $content = $charsetConverter->conv($content, 'utf-8', $this->metaCharset, true);
+                $content = $charsetConverter->conv($content, 'utf-8', $this->metaCharset, true, $this->unicodeNormalization);
             } catch (UnknownCharsetException $e) {
                 throw new \RuntimeException('Invalid config.metaCharset: ' . $e->getMessage(), 1508916185);
             }
@@ -4307,6 +4383,25 @@ class TypoScriptFrontendController implements LoggerAwareInterface
         if ($this->metaCharset !== 'utf-8' && is_array($_POST) && !empty($_POST)) {
             $this->convertCharsetRecursivelyToUtf8($_POST, $this->metaCharset);
             $GLOBALS['HTTP_POST_VARS'] = $_POST;
+        }
+    }
+
+    /**
+     * Ensures all that (user-)inputs are well formed and/or normalized UTF-8.
+     */
+    public function filterAndNormalizeInputs()
+    {
+        if ($this->metaCharset === 'utf-8') {
+            if ($this->unicodeFilterInputs) {
+                UnicodeUtility::filterUtf8StringsInInputArraysRecursive(
+                    $this->unicodeFilterInputs, $this->unicodeNormalization, 'GET,POST,FILES,COOKIE'
+                );
+            }
+            if ($this->unicodeNormalizeInputs && UnicodeNormalizer::NONE < $this->unicodeNormalization) {
+                UnicodeUtility::normalizeUtf8StringsInInputArraysRecursive(
+                    $this->unicodeNormalizeInputs, $this->unicodeNormalization, 'GET,POST,FILES,COOKIE'
+                );
+            }
         }
     }
 

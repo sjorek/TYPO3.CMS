@@ -15,6 +15,7 @@ namespace TYPO3\CMS\Core\Charset;
  */
 
 use TYPO3\CMS\Core\SingletonInterface;
+use TYPO3\CMS\Core\Charset\UnicodeNormalizer;
 use TYPO3\CMS\Core\Utility\ExtensionManagementUtility;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 
@@ -217,24 +218,48 @@ class CharsetConverter implements SingletonInterface
      * @param string $fromCharset From charset (the current charset of the string)
      * @param string $toCharset To charset (the output charset wanted)
      * @param bool $useEntityForNoChar If set, then characters that are not available in the destination character set will be encoded as numeric entities
+     * @param integer $unicodeNormalization If set to one of the corresponding TYPO3\CMS\Core\Charset\UnicodeNormalizer constants, then unicode-normalization will be applied, no matter which charset is given as this method internally uses utf-8 for all conversions
      * @return string Converted string
      * @see convArray()
      */
-    public function conv($inputString, $fromCharset, $toCharset, $useEntityForNoChar = false)
+    public function conv($inputString, $fromCharset, $toCharset, $useEntityForNoChar = false, $unicodeNormalization = null)
     {
         if ($fromCharset === $toCharset) {
+            if ($toCharset === 'utf-8') {
+                /** @var UnicodeNormalizer $unicodeNormalizer */
+                $unicodeNormalizer = GeneralUtility::makeInstance(UnicodeNormalizer::class);
+                return $unicodeNormalizer->normalizeStringTo($inputString, $unicodeNormalization);
+            }
             return $inputString;
         }
         // PHP-libs don't support fallback to SGML entities, but UTF-8 handles everything
         if ($toCharset === 'utf-8' || !$useEntityForNoChar) {
+            if ($fromCharset === 'utf-8') {
+                // Normalize for the case that $toCharset is not 'utf-8' and $useEntityForNoChar is false
+                /** @var UnicodeNormalizer $unicodeNormalizer */
+                $unicodeNormalizer = GeneralUtility::makeInstance(UnicodeNormalizer::class);
+                $inputString = $unicodeNormalizer->normalizeStringTo($inputString, $unicodeNormalization);
+            }
             // Returns FALSE for unsupported charsets
             $convertedString = mb_convert_encoding($inputString, $toCharset, $fromCharset);
             if (false !== $convertedString) {
+                if ($toCharset === 'utf-8') {
+                    /** @var UnicodeNormalizer $unicodeNormalizer */
+                    $unicodeNormalizer = GeneralUtility::makeInstance(UnicodeNormalizer::class);
+                    return $unicodeNormalizer->normalizeStringTo($convertedString, $unicodeNormalization);
+                }
                 return $convertedString;
             }
         }
         if ($fromCharset !== 'utf-8') {
             $inputString = $this->utf8_encode($inputString, $fromCharset);
+        }
+        // Avoid normalizing the $inputString twice in the case of unsupported 
+        // charsets above by checking for $unicodeNormalizer exsistance
+        if (!isset($unicodeNormalizer)) {
+            /** @var UnicodeNormalizer $unicodeNormalizer */
+            $unicodeNormalizer = GeneralUtility::makeInstance(UnicodeNormalizer::class);
+            $inputString = $unicodeNormalizer->normalizeStringTo($inputString, $unicodeNormalization);
         }
         if ($toCharset !== 'utf-8') {
             $inputString = $this->utf8_decode($inputString, $toCharset, $useEntityForNoChar);
@@ -250,15 +275,16 @@ class CharsetConverter implements SingletonInterface
      * @param string $fromCharset From charset (the current charset of the string)
      * @param string $toCharset To charset (the output charset wanted)
      * @param bool $useEntityForNoChar If set, then characters that are not available in the destination character set will be encoded as numeric entities
+     * @param integer $unicodeNormalization If set to one of the corresponding TYPO3\CMS\Core\Charset\UnicodeNormalizer constants, then unicode-normalization will be applied, no matter which charset is given as this method internally uses utf-8 for all conversions
      * @see conv()
      */
-    public function convArray(&$array, $fromCharset, $toCharset, $useEntityForNoChar = false)
+    public function convArray(&$array, $fromCharset, $toCharset, $useEntityForNoChar = false, $unicodeNormalization = null)
     {
         foreach ($array as $key => $value) {
             if (is_array($array[$key])) {
-                $this->convArray($array[$key], $fromCharset, $toCharset, $useEntityForNoChar);
+                $this->convArray($array[$key], $fromCharset, $toCharset, $useEntityForNoChar, $unicodeNormalization);
             } elseif (is_string($array[$key])) {
-                $array[$key] = $this->conv($array[$key], $fromCharset, $toCharset, $useEntityForNoChar);
+                $array[$key] = $this->conv($array[$key], $fromCharset, $toCharset, $useEntityForNoChar, $unicodeNormalization);
             }
         }
     }

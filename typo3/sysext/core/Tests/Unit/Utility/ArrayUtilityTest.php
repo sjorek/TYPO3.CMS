@@ -2884,4 +2884,67 @@ class ArrayUtilityTest extends UnitTestCase
         );
         $this->assertEquals($expectedResult, $result);
     }
+
+    /**
+     * @test
+     */
+    public function checkProcessStringsInArrayRecursive()
+    {
+        $input = [
+            'a' => 'a',
+            'b' => [
+                'c' => 'true',
+                'd' => 'd',
+            ],
+        ];
+        
+        $expected = [
+            'a' => 'a',
+            'b' => [
+                'c' => true,
+                'd' => 'd',
+            ],
+        ];
+
+        ArrayUtility::processStringsInArrayRecursive($input, function($value) {
+            return $value === 'true' ? true : $value;
+        });
+
+        $this->assertSame($expected, $input);
+    }
+
+    /**
+     * @test
+     */
+    public function checkProcessStringsInInputArraysRecursive()
+    {
+        $_POST = [
+            'a' => 'a',
+            'b' => [
+                'c' => 'true',
+                'd' => 'd',
+            ],
+        ];
+        
+        $expected = [
+            'a' => 'a',
+            'b' => [
+                'c' => true,
+                'd' => 'd',
+            ],
+        ];
+
+        ArrayUtility::processStringsInInputArraysRecursive('POST', function($value) {
+            return $value === 'true' ? true : $value;
+        });
+
+        $this->assertEquals(
+            $expected, $_POST, 'superglobal $_POST is equal to the expected array'
+        );
+        if (isset($HTTP_POST_VARS)) {
+            $this->assertEquals(
+                $expected, $HTTP_POST_VARS, 'deprecated superglobal $HTTP_POST_VARS is equal to the expected array'
+            );
+        }
+    }
 }

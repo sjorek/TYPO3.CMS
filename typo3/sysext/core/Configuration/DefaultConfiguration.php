@@ -93,7 +93,15 @@ return [
         'phpTimeZone' => '',
         'systemLog' => false,
         'systemLogLevel' => 0,
-        'UTF8filesystem' => false,
+        'UTF8filesystem' => 0,
+        'unicode' => [
+            'normalizer' => '',
+            'customNormalizerClass' => '',
+            'normalizationForm' => 0,
+            'normalizeInputs' => '',
+            'filterInputs' => '',
+            'enforceUtf8EncodedRequestUri' => 0
+        ],
         'systemLocale' => '',
         'systemMaintainers' => null,    // @todo: This will be set up as an empty array once the installer can define a system maintainers
         'reverseProxyIP' => '',
@@ -1046,6 +1054,12 @@ return [
             'email' => \TYPO3\CMS\Frontend\Typolink\EmailLinkBuilder::class,
             'record' => \TYPO3\CMS\Frontend\Typolink\DatabaseRecordLinkBuilder::class,
             'unknown' => \TYPO3\CMS\Frontend\Typolink\LegacyLinkBuilder::class,
+        ],
+        'unicode' => [
+            'normalizationForm' => 0,
+            'normalizeInputs' => '',
+            'filterInputs' => '',
+            'enforceUtf8EncodedRequestUri' => 0
         ],
     ],
     'MAIL' => [ // Mail configurations to tune how \TYPO3\CMS\Core\Mail\ classes will send their mails.

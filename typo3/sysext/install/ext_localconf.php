@@ -60,6 +60,10 @@ $GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['ext/install']['update']['backendLayou
     = \TYPO3\CMS\Install\Updates\BackendLayoutIconUpdateWizard::class;
 $GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['ext/install']['update']['redirects']
     = \TYPO3\CMS\Install\Updates\RedirectsExtensionUpdate::class;
+$GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['ext/install']['update'][\TYPO3\CMS\Install\Updates\ResourceStorageUtf8FileSystemUpdate::class]
+    = \TYPO3\CMS\Install\Updates\ResourceStorageUtf8FileSystemUpdate::class;
+$GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['ext/install']['update'][\TYPO3\CMS\Install\Updates\ResourceStorageConfigurationUpdate::class]
+    = \TYPO3\CMS\Install\Updates\ResourceStorageConfigurationUpdate::class;
 
 $iconRegistry = \TYPO3\CMS\Core\Utility\GeneralUtility::makeInstance(\TYPO3\CMS\Core\Imaging\IconRegistry::class);
 $icons = [

@@ -97,6 +97,9 @@ class RequestHandler implements RequestHandlerInterface, PsrRequestHandlerInterf
         // Convert POST data to utf-8 for internal processing if metaCharset is different
         $controller->convPOSTCharset();
 
+        // Ensures all that (user-)inputs are well formed and/or normalized UTF-8.
+        $controller->filterAndNormalizeInputs();
+
         $controller->initializeRedirectUrlHandlers();
 
         $controller->handleDataSubmission();

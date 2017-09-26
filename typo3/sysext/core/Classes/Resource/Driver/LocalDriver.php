@@ -14,6 +14,7 @@ namespace TYPO3\CMS\Core\Resource\Driver;
  * The TYPO3 project - inspiring people to share!
  */
 
+use TYPO3\CMS\Core\Charset\UnicodeNormalizer;
 use TYPO3\CMS\Core\Resource\Exception;
 use TYPO3\CMS\Core\Resource\FolderInterface;
 use TYPO3\CMS\Core\Resource\ResourceStorage;
@@ -286,6 +287,18 @@ class LocalDriver extends AbstractHierarchicalFilesystemDriver
     }
 
     /**
+     * {@inheritDoc}
+     * @see \TYPO3\CMS\Core\Resource\Driver\AbstractDriver::getUtf8FileSystemMode()
+     */
+    public function getUtf8FileSystemMode() {
+        if (isset($this->configuration['UTF8filesystem'])) {
+            return (int)$this->configuration['UTF8filesystem'];
+        }
+        // LocalDriver uses configured global fallback
+        return (int)$GLOBALS['TYPO3_CONF_VARS']['SYS']['UTF8filesystem'];
+    }
+
+    /**
      * Returns a string where any character not matching [.a-zA-Z0-9_-] is
      * substituted by '_'
      * Trailing dots are removed
@@ -299,8 +312,14 @@ class LocalDriver extends AbstractHierarchicalFilesystemDriver
      */
     public function sanitizeFileName($fileName, $charset = 'utf-8')
     {
-        // Handle UTF-8 characters
-        if ($GLOBALS['TYPO3_CONF_VARS']['SYS']['UTF8filesystem']) {
+            // Handle UTF-8 characters
+        $utf8Filesystem = $this->getUtf8FileSystemMode();
+
+        if (UnicodeNormalizer::NONE < $utf8Filesystem) {
+            $fileName = $this->getCharsetConversion()->conv($fileName, 'utf-8', 'utf-8', false, $utf8Filesystem);
+        }
+
+        if ($utf8Filesystem) {
             // Allow ".", "-", 0-9, a-z, A-Z and everything beyond U+C0 (latin capital letter a with grave)
             $cleanFileName = preg_replace('/[' . self::UNSAFE_FILENAME_CHARACTER_EXPRESSION . ']/u', '_', trim($fileName));
         } else {

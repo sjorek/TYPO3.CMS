@@ -863,4 +863,84 @@ class ArrayUtility
 
         return $array;
     }
+
+    /**
+     * Process all elements in ARRAY with type string with a method of this object.
+     * 
+     * NOTICE: Array is passed by reference!
+     *
+     * @param array   $array      Input array, possibly multidimensional
+     * @param string  $callback   The callback closure used to process the value of all strings
+     * @param boolean $skipEmpty  [optional] If TRUE empty elements are skipped. Is TRUE by default.
+     * @return void
+     */
+    public static function processStringsInArrayRecursive(array & $array, \Closure $callback, $skipEmpty = true)
+    {
+        foreach ($array as & $item) {
+            if (!(is_array($item) || is_string($item)) || ($skipEmpty && empty($item))) {
+                continue;
+            } elseif (is_array($item)) {
+                self::processStringsInArrayRecursive($item, $callback, $skipEmpty);
+            } elseif (is_string($item)) {
+                $item = $callback($item);
+            }
+        }
+    }
+
+    /**
+     * Process all elements in the given inputs with type string with a method of this object.
+     *
+     * @param string  $inputs     ALL or comma-separated list of global input-array names without leading "$_"
+     * @param string  $callback   The callback closure used to process the value of all strings
+     * @param boolean $skipEmpty  [optional] If TRUE empty elements are skipped. Is TRUE by default.
+     * @param string  $allowed    [optional] A comma-separated list of allowed input-arrays
+     * @return void
+     */
+    public static function processStringsInInputArraysRecursive(
+        $inputs, \Closure $callback, $skipEmpty = true, $allowed='ALL'
+    ) {
+        $inputs = GeneralUtility::trimExplode(',', strtoupper($inputs), true);
+        if (empty($inputs)) {
+            return;
+        }
+        $inputs = array_unique($inputs);
+        $all = in_array('ALL', $inputs, true);
+        $superglobals = array(
+            'ENV'       => & $_ENV,
+            'GET'       => & $_GET,
+            'POST'      => & $_POST,
+            'FILES'     => & $_FILES,
+            'COOKIE'    => & $_COOKIE,
+            'SERVER'    => & $_SERVER,
+            'REQUEST'   => & $_REQUEST,
+            'SESSION'   => & $_SESSION
+        );
+        $allowed = strtoupper(trim($allowed));
+        foreach ($superglobals as $name => & $array) {
+            if (! is_array($array) || empty($array)) {
+                continue;
+            }
+            if (($allowed === 'ALL' || GeneralUtility::inList($allowed, $name)) &&
+                ($all || in_array($name, $inputs, true)))
+            {
+                self::processStringsInArrayRecursive($array, $callback, $skipEmpty);
+                $deprecatedSuperglobal = false;
+                switch($name) {
+                    case 'ENV':
+                    case 'GET':
+                    case 'POST':
+                    case 'COOKIE':
+                    case 'SESSION':
+                        $deprecatedSuperglobal = sprintf('HTTP_%s_VARS', $name);
+                        break;
+                    case 'FILES':
+                        $deprecatedSuperglobal = 'HTTP_POST_FILES';
+                        break;
+                }
+                if ($deprecatedSuperglobal && isset($GLOBALS[$deprecatedSuperglobal])) {
+                    $GLOBALS[$deprecatedSuperglobal] = & $array;
+                }
+            }
+        }
+    }
 }

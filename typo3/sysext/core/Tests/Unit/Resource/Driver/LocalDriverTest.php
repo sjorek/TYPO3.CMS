@@ -16,6 +16,7 @@ namespace TYPO3\CMS\Core\Tests\Unit\Resource\Driver;
 
 use org\bovigo\vfs\vfsStream;
 use org\bovigo\vfs\vfsStreamWrapper;
+use TYPO3\CMS\Core\Charset\UnicodeNormalizer;
 use TYPO3\CMS\Core\Resource\Exception\InvalidFileNameException;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\TestingFramework\Core\FileStreamWrapper;
@@ -1462,6 +1463,7 @@ class LocalDriverTest extends \TYPO3\CMS\Core\Tests\Unit\Resource\BaseTestCase
 
     /**
      * Set up data for sanitizeFileName tests
+     * @todo TODO Feature #57695: Test all unicode-normalization forms, this seems to cover NFC only, see http://forge.typo3.org/issues/57695
      */
     public function setUpCharacterStrings()
     {
@@ -1505,7 +1507,7 @@ class LocalDriverTest extends \TYPO3\CMS\Core\Tests\Unit\Resource\BaseTestCase
     public function sanitizeFileNameUTF8FilesystemDataProvider()
     {
         $this->setUpCharacterStrings();
-        return [
+        $payload = [
             // Characters ordered by ASCII table
             'allowed characters utf-8 (ASCII part)' => [
                 '-.0123456789@ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz',
@@ -1524,23 +1526,45 @@ class LocalDriverTest extends \TYPO3\CMS\Core\Tests\Unit\Resource\BaseTestCase
                 ' test.txt  ',
                 'test.txt'
             ],
-            'remove tailing dot' => [
+            'remove trailing dot' => [
                 'test.txt.',
                 'test.txt'
             ],
         ];
+        $normalizations = array(
+            'no unicode-normalization' => UnicodeNormalizer::NONE,
+            'unicode-normalization NFC' => UnicodeNormalizer::NFC,
+            'unicode-normalization NFD' => UnicodeNormalizer::NFD
+            // Not needed:
+            // 'unicode-normalization NFKD' => UnicodeNormalizer::NFKD
+            // 'unicode-normalization NFKC' => UnicodeNormalizer::NFKC
+        );
+        $data = array();
+        foreach ($normalizations as $filesystemCaption => $filesystemNormalization) {
+            foreach ($normalizations as $configurationCaption => $configurationNormalization) {
+                foreach ($payload as $key => $arguments) {
+                    $key  = $key . ' for utf8-filesystem with ' . $filesystemCaption;
+                    $key .= ' and driver configured for ' . $configurationCaption;
+                    $data[$key] = $arguments;
+                    $data[$key][] = $filesystemNormalization;
+                    $data[$key][] = $configurationNormalization;
+                }
+            }
+        }
+        return $data;
     }
 
     /**
      * @test
      * @dataProvider sanitizeFileNameUTF8FilesystemDataProvider
      */
-    public function sanitizeFileNameUTF8Filesystem($fileName, $expectedResult)
+    public function sanitizeFileNameUTF8Filesystem($fileName, $expectedResult, $UTF8filesystem, $UTF8filesystem2)
     {
-        $GLOBALS['TYPO3_CONF_VARS']['SYS']['UTF8filesystem'] = 1;
+        $GLOBALS['TYPO3_CONF_VARS']['SYS']['UTF8filesystem'] = $UTF8filesystem;
+        $configuration = array('UTF8filesystem' => $UTF8filesystem2);
         $this->assertEquals(
             $expectedResult,
-            $this->createDriver()->sanitizeFileName($fileName)
+            $this->createDriver($configuration)->sanitizeFileName($fileName)
         );
     }
 
@@ -1557,7 +1581,7 @@ class LocalDriverTest extends \TYPO3\CMS\Core\Tests\Unit\Resource\BaseTestCase
     public function sanitizeFileNameNonUTF8FilesystemDataProvider()
     {
         $this->setUpCharacterStrings();
-        return [
+        $payload = [
             // Characters ordered by ASCII table
             'allowed characters iso-8859-1' => [
                 '-.0123456789@ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz',
@@ -1621,18 +1645,36 @@ class LocalDriverTest extends \TYPO3\CMS\Core\Tests\Unit\Resource\BaseTestCase
                 'test.txt'
             ],
         ];
+        $normalizations = array(
+            'no unicode-normalization' => UnicodeNormalizer::NONE,
+            'unicode-normalization NFC' => UnicodeNormalizer::NFC,
+            'unicode-normalization NFD' => UnicodeNormalizer::NFD
+            // Not needed:
+            // 'unicode-normalization NFKD' => UnicodeNormalizer::NFKD
+            // 'unicode-normalization NFKC' => UnicodeNormalizer::NFKC
+        );
+        $data = array();
+        foreach ($normalizations as $caption => $normalization) {
+            foreach ($payload as $key => $arguments) {
+                $key = $key . ' for non utf8-filesystem with driver configured for ' . $caption;
+                $data[$key] = $arguments;
+                $data[$key][] = $normalization;
+            }
+        }
+        return $data;
     }
 
     /**
      * @test
      * @dataProvider sanitizeFileNameNonUTF8FilesystemDataProvider
      */
-    public function sanitizeFileNameNonUTF8Filesystem($fileName, $charset, $expectedResult)
+    public function sanitizeFileNameNonUTF8Filesystem($fileName, $charset, $expectedResult, $unicodeNormalization)
     {
         $GLOBALS['TYPO3_CONF_VARS']['SYS']['UTF8filesystem'] = 0;
+        $configuration = array('UTF8filesystem' => $unicodeNormalization);
         $this->assertEquals(
             $expectedResult,
-            $this->createDriver()->sanitizeFileName($fileName, $charset)
+            $this->createDriver($configuration)->sanitizeFileName($fileName, $charset)
         );
     }
 

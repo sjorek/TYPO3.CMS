@@ -114,3 +114,9 @@ $GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['urlProcessing']['urlHandlers']['front
 \TYPO3\CMS\Core\Utility\ExtensionManagementUtility::addPageTSConfig(
     '<INCLUDE_TYPOSCRIPT: source="FILE:EXT:frontend/Configuration/TSconfig/Page/TCEFORM.txt">'
 );
+
+// Register hook to redirect to unicode-nomalized request-uri if needed
+if ($GLOBALS['TYPO3_CONF_VARS']['FE']['unicode']['enforceToUtf8EncodedUri']) {
+	// We do it as early as possible, to avoid cacheHash corruption and other nasty attempts to poison the process 
+    $GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['tslib/index_ts.php']['preprocessRequest'][] = \TYPO3\CMS\Frontend\Hooks\UnicodeHooks::class . '->hook_enforceUtf8EncodedRequestUri';
+}

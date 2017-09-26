@@ -853,6 +853,64 @@ Will create a link to page with id 29 and add GET parameters where the return UR
 			<default><![CDATA[
 ]]></default>
 		</property>
+		<property name="unicode" type="array">
+			<description><![CDATA[Unicode-related configuration, only relevant if .metaCharset is set to utf-8
+
+.normalizationForm
+
+Configuration of unicode normalization-form of the output page content. Only relevant if ".metaCharset" is utf8.
+Unicode-Normalization is a process that involves transforming characters and sequences of characters into a
+formally-defined underlying representation. The Unicode Consortium has defined a number of normalization forms
+reflecting the various needs of applications. The different forms are defined in terms of a set of transformations
+on the text, transformations that are expressed by both an algorithm and a set of data files.
+
+Supported case-insensitive normalization-form aliases:
+- Disable unicode-normalization     : 0, false, null or an empty value (default)
+- Ignore/skip unicode-normalization : 1, NONE, true, any, binary, default
+- Normalization form D              : 2, NFD, FORM_D, D, decompose, collation, mac
+- Normalization form KD             : 3, NFKD, FORM_KD, KD
+- Normalization form C              : 4, NFC, FORM_C, C, re-compose, legacy, html5
+- Normalization form KC             : 5, NFKC, FORM_KC, KC, matching
+
+Meaning of the unicode normalization-forms:
+- 2: normalization form D (NFD)     : canonical decomposition
+- 3: Normalization Form KD (NFKD)   : compatibility decomposition
+- 4: Normalization Form C (NFC)     : canonical decomposition followed by canonical composition
+- 5: Normalization Form KC (NFKC)   : compatibility decomposition followed by canonical composition
+
+Hint:
+The W3C recommends NFC for HTML5 Output.
+
+Example:
+config.unicode.normalizationForm = NFC
+
+
+.filterUserInputs
+
+Ensures all that (user-)inputs are well formed and normalized UTF-8.
+Supported inputs are $_GET, $_POST, $_FILES and $_COOKIE.
+
+Supported values are "ALL" or comma-seperated list of global input-array names without leading "$_".
+
+Example:
+config.unicode.filterUserInputs = ALL
+config.unicode.filterUserInputs = GET, POST, FILES, COOKIE
+
+
+.normalizeUserInputs
+
+Ensures all that (user-)inputs are normalized UTF-8. The property .filterUserInputs takes
+precedence over this property. Supported inputs are $_GET, $_POST, $_FILES and $_COOKIE.
+
+Supported values are "ALL" or comma-seperated list of global input-array names without leading "$_".
+
+Example:
+config.unicode.normalizeUserInputs = ALL
+config.unicode.normalizeUserInputs = GET, POST, FILES, COOKIE
+
+]]></description>
+			<default><![CDATA[]]></default>
+		</property>
 		<property name="xhtmlDoctype" type="string">
 			<description><![CDATA[Sets the document type for the XHTML version of the generated page.
 

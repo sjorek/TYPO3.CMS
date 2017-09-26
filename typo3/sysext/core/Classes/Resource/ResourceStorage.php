@@ -14,6 +14,7 @@ namespace TYPO3\CMS\Core\Resource;
  * The TYPO3 project - inspiring people to share!
  */
 
+use TYPO3\CMS\Core\Charset\UnicodeNormalizer;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Log\LogManager;
 use TYPO3\CMS\Core\Registry;
@@ -350,6 +351,27 @@ class ResourceStorage implements ResourceStorageInterface
     public function usesCaseSensitiveIdentifiers()
     {
         return $this->driver->isCaseSensitiveFileSystem();
+    }
+
+    /**
+     * Returns TRUE if the identifiers used by this storage are utf8-encoded.
+     *
+     * @return bool
+     */
+    public function usesUtf8Identifiers()
+    {
+        return $this->driver->isUtf8FileSystem();
+    }
+
+    /**
+     * Returns utf-8 file system mode. The value corresponds to
+     * those allowed for TYPO3_CONF_VARS[SYS][UTF8fileystem].
+     *
+     * @return integer
+     */
+    public function getUtf8FileSystemMode()
+    {
+        return $this->driver->getUtf8FileSystemMode();
     }
 
     /**

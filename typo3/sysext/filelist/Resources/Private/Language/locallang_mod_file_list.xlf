@@ -105,6 +105,24 @@
 			<trans-unit id="localDriverFlexform_caseSensitive">
 				<source>Uses case sensitive identifiers</source>
 			</trans-unit>
+			<trans-unit id="localDriverFlexform_utf8filesystem" xml:space="preserve">
+				<source>Use UTF-8 filesystem with or without unicode-normalized identifiers</source>
+			</trans-unit>
+			<trans-unit id="localDriverFlexform_utf8filesystem_na" xml:space="preserve">
+				<source>UTF-8 file names are disabled or not available</source>
+			</trans-unit>
+			<trans-unit id="localDriverFlexform_utf8filesystem_none" xml:space="preserve">
+				<source>UTF-8 file names are enabled and ignore any unicode-normalization (NONE)</source>
+			</trans-unit>
+			<trans-unit id="localDriverFlexform_utf8filesystem_nfc" xml:space="preserve">
+				<source>UTF-8 file names are enabled and use recomposed unicode-normalization (NFC)</source>
+			</trans-unit>
+			<trans-unit id="localDriverFlexform_utf8filesystem_nfd" xml:space="preserve">
+				<source>UTF-8 file names are enabled and use decomposed unicode-normalization (NFD)</source>
+			</trans-unit>
+			<trans-unit id="localDriverFlexform_utf8filesystem_nfd_mac" xml:space="preserve">
+				<source>UTF-8 file names are enabled and use Apple™'s variant of decomposed unicode-normalization (NFD_MAC)</source>
+			</trans-unit>
 			<trans-unit id="storageNotBrowsableTitle">
 				<source>Access denied.</source>
 			</trans-unit>

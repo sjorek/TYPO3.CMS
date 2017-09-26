@@ -144,8 +144,82 @@ SYS:
               '4': 'Severity: Fatal Error'
             description: 'Enable the severity of log messages to be logged (see systemLog option) - Only messages with same or higher severity are logged.'
         UTF8filesystem:
-            type: bool
-            description: 'If TRUE then TYPO3 uses utf-8 to store file names. This allows for accented Latin letters as well as any other non-latin characters like Cyrillic and Chinese.'
+            # type: int
+            type: dropdown
+            allowedValues:
+              '0': 'Do not utf-8 to store file names'
+              '1': 'Use utf-8 to store file names'
+              '4': 'Use utf-8 normalized to NFC to store file names'
+              # Not encouraged, but better than nothing on Apple™'s HFS+ (OS X Extended) filesystem
+              '2': 'Use utf-8 normalized to NFD to store file names'
+              # Encouraged for Apple™'s HFS+ (OS X Extended) filesystem
+              '32': 'Use utf-8 normalized to Apple™''s NFD to store file names'
+              # Not supported as they are lossy! 
+              # '3': 'Use utf-8 normalized to NFKD to store file names'
+              # '5': 'Use utf-8 normalized to NFKC to store file names'
+            description: 'If > 0 then TYPO3 uses utf-8 to store file names. This allows for accented Latin letters as well as any other non-latin characters like Cyrillic and Chinese. Values > 1 additionally activate unicode-normalization for filepaths, if any normalizer has been registered under <a href="#SYS-unicode-normalizer">$TYPO3_CONF_VARS[''SYS''][''unicode''][''normalizer'']</a>. You can choose either NFC (4) or NFD (2) unicode-normalization-form. NFC is the most widespread (defacto worldwide) standard and for most western languages it preserves some bytes compared to NFD. Apple™ uses a special variant of NFD to store paths in their HFS+ filesystem. NFD provides potential for significant faster sorting algorithms and saves some memory for languages composing their symbols from fractions, ie. many asian languages. If you choose something else than NFD here HFS+ Filesystems will still use store file names in Apple™''s NFD. For further details see <code>TYPO3\CMS\Core\Charset\Unicode\NormalizerInterface::NFD_MAC</code>.'
+        unicode:
+            type: container
+            items:
+                normalizer:
+                    type: text
+                    allowedValues:
+                      'intl'      : 'Native PHP "intl"-extension. (preferred)'
+                      'patchwork' : 'Pure PHP "patchwork/utf8" composer package'
+                      'symfony'   : 'Pure PHP "symfony/polyfill-intl-normalizer" composer package'
+                      'mac'       : 'Native PHP "iconv"-extension plus one of the three from above'
+                      'stub'      : 'No implementation available (disables normalization)'
+                      'custom'    : 'Custom implementation from ''SYS/unicode/customNormalizerClass'''
+                    description: 'Select which unicode normalizer implementation to use. If you (need to) select stub here, you must disable unicode normalizatio in <a href="#SYS-unicode-normalizationForm">$TYPO3_CONF_VARS[''SYS''][''unicode''][''normalizationForm'']</a> and <a href="#FE-unicode-normalizationForm">$TYPO3_CONF_VARS[''FE''][''unicode''][''normalizationForm'']</a> by setting their value to 0 and you must disable normalization support in <a href="#SYS-UTF8filesystem">$TYPO3_CONF_VARS[''SYS''][''UTF8filesystem'']</a> by setting its value to 0 or 1. For further details see <code>TYPO3\CMS\Core\Charset\UnicodeNormalizer</code>.'
+                customNormalizerClass:
+                    type: phpClass
+                    description: 'A PHP class implementing unicode normalization. Only used if <a href="#SYS-unicode-normalizer">$TYPO3_CONF_VARS[''SYS''][''unicode''][''normalizer'']</a> has been set to ''custom''. For further details see <code>TYPO3\CMS\Core\Charset\UnicodeNormalizer</code>.'
+                normalizationForm:
+                    type: int
+                    allowedValues:
+                      '0': 'Disable any unicode-normalization (default)'
+                      '1': 'Allow any unicode-normalization'
+                      '2': 'Allow any unicode-normalization and use NFD per default'
+                      '3': 'Allow any unicode-normalization and use NFKD per default'
+                      '4': 'Allow any unicode-normalization and use NFC per default'
+                      '5': 'Allow any unicode-normalization and use NFKC per default'
+                    description: 'Determines default unicode normalization-form unless overridden in code. The default value 0 completely disables any unicode-normalization attempts and the value 1 allows any unicode normalization-form. Values larger than 1 directly refer to one of the four normalization-forms: NFD(2), NFKD(3), NFC(4) and NFKC(5). The W3C recommends NFC for HTML5. Only use values ≥ 1 if any normalizer has been registered under <a href="#SYS-unicode-normalizer">$TYPO3_CONF_VARS[''SYS''][''unicode''][''normalizer'']</a>. For further details see <code>TYPO3\CMS\Core\Charset\UnicodeNormalizer</code> and <code>TYPO3\CMS\Core\Charset\Unicode\NormalizerInterface</code>.'
+                normalizeInputs:
+                    type: list
+                    allowedValues:
+                      'GET'     : 'Normalize unicode-representation in superglobal $_GET'
+                      'POST'    : 'Normalize unicode-representation in superglobal $_POST'
+                      'FILES'   : 'Normalize unicode-representation in superglobal $_FILES'
+                      'COOKIE'  : 'Normalize unicode-representation in superglobal $_COOKIE'
+                      'ENV'     : 'Normalize unicode-representation in superglobal $_ENV'
+                      'SERVER'  : 'Normalize unicode-representation in superglobal $_SERVER'
+                      'REQUEST' : 'Normalize unicode-representation in superglobal $_REQUEST'
+                      'SESSION' : 'Normalize unicode-representation in superglobal $_SESSION'
+                      'ALL'     : 'Shortcut for a list of all of the above keys'
+                    description: 'Activates unicode-normalization for some or all global user-input-replated arrays, like the prominent $_POST array. If enabled the the algorithm ensures for all elements in listed globals with type string to be well-formed and normalized UTF-8. A comma-seperated list of the named globals without their prefix "$_…", like "FILES", "ENV", "GET", "POST", "COOKIE", "SERVER" or "REQUEST". The value "ALL" refers to all of them at once and the empty "" value disables any normalization attempts. Only use if any normalizer has been registered under <a href="#SYS-unicode-normalizer">$TYPO3_CONF_VARS[''SYS''][''unicode''][''normalizer'']</a>. For further details see <code>TYPO3\CMS\Core\Utility\UnicodeUtility::normalizeUtf8StringsInInputArraysRecursive</code>.'
+                filterInputs:
+                    type: list
+                    allowedValues:
+                      'GET'     : 'Ensure well-formed and normalized UTF-8 in superglobal $_GET'
+                      'POST'    : 'Ensure well-formed and normalized UTF-8 in superglobal $_POST'
+                      'FILES'   : 'Ensure well-formed and normalized UTF-8 in superglobal $_FILES'
+                      'COOKIE'  : 'Ensure well-formed and normalized UTF-8 in superglobal $_COOKIE'
+                      'ENV'     : 'Ensure well-formed and normalized UTF-8 in superglobal $_ENV'
+                      'SERVER'  : 'Ensure well-formed and normalized UTF-8 in superglobal $_SERVER'
+                      'REQUEST' : 'Ensure well-formed and normalized UTF-8 in superglobal $_REQUEST'
+                      'SESSION' : 'Ensure well-formed and normalized UTF-8 in superglobal $_SESSION'
+                      'ALL'     : 'Shortcut for a list of all of the above keys'
+                    description: 'Ensure well-formed and optionally normalized UTF-8 for some or all global user-input-replated arrays, like the prominent $_POST array. If enabled the the algorithm ensures for all elements in listed globals with type string to be well-formed and normalized UTF-8. A comma-seperated list of the named globals without their prefix "$_…", like "FILES", "ENV", "GET", "POST", "COOKIE", "SERVER" or "REQUEST". The value "ALL" refers to all of them at once and the empty "" value disables any filtering attempts. Additional unicode normalization is only available if any normalizer has been registered under <a href="#SYS-unicode-normalizer">$TYPO3_CONF_VARS[''SYS''][''unicode''][''normalizer'']</a>. For further details see <code>TYPO3\CMS\Core\Utility\UnicodeUtility::filterUtf8StringsInInputArraysRecursive</code>.'
+                enforceUtf8EncodedRequestUri:
+                    type: int
+                    allowedValues:
+                      '0'   : 'Disabled'
+                      '301' : 'Permanent redirect (HTTP Status 301) to properly encoded url, if request-type is GET. This is compatible to HTTP/1.0.'
+                      '303' : 'Follow redirect (HTTP Status 303) to properly encoded url, for any request-type. May break POST and other request, but is compatible to HTTP/1.0.'
+                      '308' : 'Permanent redirect (HTTP Status 308) to properly encoded url, for any request-type. This is compatible to HTTP/1.1 and always preferred, as it does not break request-types other than GET.'
+                      '400' : 'Send a bad request status message (HTTP Status 400).'
+                      '404' : 'Send a not found status message (HTTP Status 404) - should be the same result, as disabling this feature.'
+                    description: 'Activate enforcing of urlencoded, well-formed and optionally normalized UTF-8 request uris in frontend. . Optional unicode normalization is only available if any normalizer has been registered under <a href="#SYS-unicode-normalizer">$TYPO3_CONF_VARS[''SYS''][''unicode''][''normalizer'']</a>. For further details see <code>TYPO3\CMS\Core\Utility\UnicodeUtility::enforceUtf8EncodedRequestUri</code>.'
         systemLocale:
             type: text
             description: 'Locale used for certain system related functions, e.g. escaping shell commands. If problems with filenames containing special characters occur, the value of this option is probably wrong. See <a href="http://php.net/manual/en/function.setlocale.php" target="_blank">setlocale()</a>.'
@@ -468,6 +542,48 @@ FE:
               Allows to automatically include a version number (timestamp of the file) to referred CSS and JS filenames
               on the rendered page. This will make browsers and proxies reload the files if they change (thus avoiding caching issues).
               <strong>IMPORTANT</strong>: ''embed'' requires extra <code>.htaccess</code> rules to work (please refer to the <code>_.htaccess</code> file shipped with TYPO3)'
+        unicode:
+            type: container
+            items:
+                normalizationForm:
+                    type: int
+                    allowedValues:
+                      '0': 'Disable any unicode-normalization (default)'
+                      '1': 'Allow any unicode-normalization'
+                      '2': 'Allow any unicode-normalization and use NFD per default'
+                      '3': 'Allow any unicode-normalization and use NFKD per default'
+                      '4': 'Allow any unicode-normalization and use NFC per default'
+                      '5': 'Allow any unicode-normalization and use NFKC per default'
+                    description: 'Activate unicode-normalization support in frontend, optionally determining a default normalization form. The default value 0 completely disables any unicode-normalization attempts and the value 1 allows any unicode normalization-form. Values larger than 1 directly refer to one of the four normalization-forms: NFD(2), NFKD(3), NFC(4) and NFKC(5). The W3C recommends NFC for HTML5. For further details see <code>TYPO3\CMS\Core\Charset\UnicodeNormalizer</code> and <code>TYPO3\CMS\Core\Charset\Unicode\NormalizerInterface</code>.'
+                normalizeInputs:
+                    type: list
+                    allowedValues:
+                      'GET'     : 'Normalize unicode-representation in superglobal $_GET'
+                      'POST'    : 'Normalize unicode-representation in superglobal $_POST'
+                      'FILES'   : 'Normalize unicode-representation in superglobal $_FILES'
+                      'COOKIE'  : 'Normalize unicode-representation in superglobal $_COOKIE'
+                      'ALL'     : 'Shortcut for a list of all of the above keys'
+                    description: 'Activates unicode-normalization in frontend for some or all global user-input-replated arrays, like the prominent $_POST array. If enabled the the algorithm ensures for all elements in listed globals with type string to be well-formed and normalized UTF-8. A comma-seperated list of the named globals without their prefix "$_…", like "FILES", "GET", "POST" or "COOKIE". The value "ALL" refers to all of them at once and the empty "" value disables any normalization attempts. Only use if any normalizer has been registered under <a href="#SYS-unicode-normalizer">$TYPO3_CONF_VARS[''SYS''][''unicode''][''normalizer'']</a>. For further details see <code>TYPO3\CMS\Core\Utility\UnicodeUtility::normalizeUtf8StringsInInputArraysRecursive</code>.'
+                filterInputs:
+                    type: list
+                    allowedValues:
+                      'GET'     : 'Ensure well-formed and normalized UTF-8 in superglobal $_GET'
+                      'POST'    : 'Ensure well-formed and normalized UTF-8 in superglobal $_POST'
+                      'FILES'   : 'Ensure well-formed and normalized UTF-8 in superglobal $_FILES'
+                      'COOKIE'  : 'Ensure well-formed and normalized UTF-8 in superglobal $_COOKIE'
+                      'ALL'     : 'Shortcut for a list of all of the above keys'
+                    description: 'Ensure well-formed and optionally normalized UTF-8 in frontend for some or all global user-input-replated arrays, like the prominent $_POST array. If enabled the the algorithm ensures for all elements in listed globals with type string to be well-formed and normalized UTF-8. A comma-seperated list of the named globals without their prefix "$_…", like "FILES", "GET", "POST" or "COOKIE". The value "ALL" refers to all of them at once and the empty "" value disables any filtering attempts. Optional unicode normalization is only available if any normalizer has been registered under <a href="#SYS-unicode-normalizer">$TYPO3_CONF_VARS[''SYS''][''unicode''][''normalizer'']</a>. For further details see <code>TYPO3\CMS\Core\Utility\UnicodeUtility::filterUtf8StringsInInputArraysRecursive</code>.'
+                enforceUtf8EncodedRequestUri:
+                    type: int
+                    allowedValues:
+                      '0'   : 'Disabled'
+                      '1'   : 'Use global default from TYPO3_CONF_VARS[SYS][unicode][enforceUtf8EncodedRequestUri].'
+                      '301' : 'Permanent redirect (HTTP Status 301) to properly encoded url, if request-type is GET. This is compatible to HTTP/1.0.'
+                      '303' : 'Follow redirect (HTTP Status 303) to properly encoded url, for any request-type. May break POST and other request, but is compatible to HTTP/1.0.'
+                      '308' : 'Permanent redirect (HTTP Status 308) to properly encoded url, for any request-type. This is compatible to HTTP/1.1 and always preferred, as it does not break request-types other than GET.'
+                      '400' : 'Send a bad request status message (HTTP Status 400).'
+                      '404' : 'Send a not found status message (HTTP Status 404) - should be the same result, as disabling this feature.'
+                    description: 'Activate enforcing of urlencoded, well-formed and optionally normalized UTF-8 request uris in frontend. . Optional unicode normalization is only available if any normalizer has been registered under <a href="#SYS-unicode-normalizer">$TYPO3_CONF_VARS[''SYS''][''unicode''][''normalizer'']</a>. For further details see <code>TYPO3\CMS\Core\Utility\UnicodeUtility::enforceUtf8EncodedRequestUri</code>.'
 MAIL:
     type: container
     items:

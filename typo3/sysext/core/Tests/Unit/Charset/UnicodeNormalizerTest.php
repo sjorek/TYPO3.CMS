@@ -1,0 +1,168 @@
+<?php
+namespace TYPO3\CMS\Core\Tests\Unit\Charset;
+
+use TYPO3\CMS\Core\Charset\Unicode\NormalizerInterface;
+
+/*
+ * This file is part of the TYPO3 CMS project.
+ *
+ * It is free software; you can redistribute it and/or modify it under
+ * the terms of the GNU General Public License, either version 2
+ * of the License, or any later version.
+ *
+ * For the full copyright and license information, please read the
+ * LICENSE.txt file that was distributed with this source code.
+ *
+ * The TYPO3 project - inspiring people to share!
+ */
+
+// We must not use a "use"-statement as we need to prepare the registration 
+// use TYPO3\CMS\Core\Charset\UnicodeNormalizer;
+
+/**
+ * Testcase for \TYPO3\CMS\Core\Charset\UnicodeNormalizer
+ *
+ * @author Stephan Jorek <stephan.jorek@gmail.com>
+ */
+class UnicodeNormalizerTest extends Unicode\AbstractNormalizerTestCase
+{
+
+    /**
+     * @var \TYPO3\CMS\Core\Charset\UnicodeNormalizer
+     */
+    protected $subject;
+
+    /**
+     * @var string
+     */
+    protected $implementationClass = 'TYPO3\\CMS\\Core\\Charset\\UnicodeNormalizer';
+
+    /**
+     * {@inheritDoc}
+     * @see Unicode\AbstractNormalizerTestCase::setUpDataProvider()
+     */
+    protected function setUpBeforeDataProvider()
+    {
+        $GLOBALS['TYPO3_CONF_VARS']['SYS']['unicode']['normalizer'] = 'intl';
+    }
+
+    /**
+     * {@inheritDoc}
+     * @see \PHPUnit\Framework\TestCase::setUp()
+     */
+    protected function setUpBefore() {
+        $GLOBALS['TYPO3_CONF_VARS']['SYS']['unicode']['normalizer'] = 'intl';
+        $GLOBALS['TYPO3_CONF_VARS']['SYS']['unicode']['normalizationForm'] = NormalizerInterface::NFC;
+    }
+
+    /**
+     *
+     * @param boolean $expected
+     * @param string $string
+     * @param integer|null $form
+     * @test
+     * @covers \TYPO3\CMS\Core\Charset\UnicodeNormalizer::isNormalized()
+     * @dataProvider provideCheckIsNormalizedData
+     */
+    public function checkIsNormalized($expected, $string, $form)
+    {
+        if ($expected === true) {
+            $this->assertTrue($this->subject->isNormalized($string, $form));
+        } else {
+            $this->assertFalse($this->subject->isNormalized($string, $form));
+        }
+    }
+
+    /**
+     *
+     * @param string|false $expected
+     * @param string $actual
+     * @param integer|null $form
+     * @test
+     * @covers \TYPO3\CMS\Core\Charset\UnicodeNormalizer::normalize()
+     * @dataProvider provideCheckNormalizeData
+     */
+    public function checkNormalize($expected, $actual, $form)
+    {
+        if ($expected !== false) {
+            $this->assertSame($expected, $this->subject->normalize($actual, $form));
+        } else {
+            $this->assertFalse($this->subject->normalize($actual, $form));
+        }
+    }
+
+    /**
+     *
+     * @param string $unicodeVersion
+     * @param integer $form
+     * @param Fixtures\UnicodeNormalizationTestReader $fileIterator
+     * @test
+     * @large
+     * @covers \TYPO3\CMS\Core\Charset\UnicodeNormalizer::normalize()
+     * @dataProvider provideCheckNormalizeConformanceData
+     */
+    public function checkNormalizeConformance(
+        $unicodeVersion, $form, Fixtures\UnicodeNormalizationTestReader $fileIterator
+    ) {
+        foreach($fileIterator as $lineNumber => $data) {
+            list($comment, $codes) = $data;
+            $testIterator = $this->checkNormalizeConformanceIterator(
+                $unicodeVersion, $form, $lineNumber, $comment, $codes
+                );
+            foreach($testIterator as $message => $data) {
+                list($expected, $actual) = $data;
+                $this->assertSame($expected, $this->subject->normalize($actual, $form), $message);
+            }
+        }
+    }
+
+    /**
+     *
+     * @param string $unicodeVersion
+     * @param integer $form
+     * @param Fixtures\UnicodeNormalizationTestReader $fileIterator
+     * @test
+     * @large
+     * @covers \TYPO3\CMS\Core\Charset\UnicodeNormalizer::normalizeTo()
+     * @dataProvider provideCheckNormalizeConformanceData
+     */
+    public function checkNormalizeToConformance(
+        $unicodeVersion, $form, Fixtures\UnicodeNormalizationTestReader $fileIterator
+    ) {
+        foreach($fileIterator as $lineNumber => $data) {
+            list($comment, $codes) = $data;
+            $testIterator = $this->checkNormalizeConformanceIterator(
+                $unicodeVersion, $form, $lineNumber, $comment, $codes
+                );
+            foreach($testIterator as $message => $data) {
+                list($expected, $actual) = $data;
+                $this->assertSame($expected, $this->subject->normalizeTo($actual, $form), $message);
+            }
+        }
+    }
+
+    /**
+     *
+     * @param string $unicodeVersion
+     * @param integer $form
+     * @param Fixtures\UnicodeNormalizationTestReader $fileIterator
+     * @test
+     * @large
+     * @covers \TYPO3\CMS\Core\Charset\UnicodeNormalizer::normalizeStringTo()
+     * @dataProvider provideCheckNormalizeConformanceData
+     */
+    public function checkNormalizeStringToConformance(
+        $unicodeVersion, $form, Fixtures\UnicodeNormalizationTestReader $fileIterator
+    ) {
+        foreach($fileIterator as $lineNumber => $data) {
+            list($comment, $codes) = $data;
+            $testIterator = $this->checkNormalizeConformanceIterator(
+                $unicodeVersion, $form, $lineNumber, $comment, $codes
+                );
+            foreach($testIterator as $message => $data) {
+                list($expected, $actual) = $data;
+                $this->assertSame($expected, $this->subject->normalizeStringTo($actual, $form), $message);
+            }
+        }
+    }
+}

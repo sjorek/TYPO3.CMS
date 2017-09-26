@@ -19,6 +19,7 @@ use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Database\Query\Restriction\FrontendRestrictionContainer;
 use TYPO3\CMS\Core\Log\LogManager;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
+use TYPO3\CMS\Core\Utility\UnicodeUtility;
 
 /**
  * Repository for accessing the file mounts
@@ -203,6 +204,8 @@ class StorageRepository extends AbstractRepository
     public function createLocalStorage($name, $basePath, $pathType, $description = '', $default = false)
     {
         $caseSensitive = $this->testCaseSensitivity($pathType === 'relative' ? PATH_site . $basePath : $basePath);
+        $UTF8filesystem = $this->testUTF8filesystem($pathType === 'relative' ? PATH_site . $basePath : $basePath);
+
         // create the FlexForm for the driver configuration
         $flexFormData = [
             'data' => [
@@ -210,7 +213,8 @@ class StorageRepository extends AbstractRepository
                     'lDEF' => [
                         'basePath' => ['vDEF' => rtrim($basePath, '/') . '/'],
                         'pathType' => ['vDEF' => $pathType],
-                        'caseSensitive' => ['vDEF' => $caseSensitive]
+                        'caseSensitive' => ['vDEF' => $caseSensitive],
+                        'UTF8filesystem' => ['vDEF' => $UTF8filesystem]
                     ]
                 ]
             ]
@@ -282,5 +286,32 @@ class StorageRepository extends AbstractRepository
         }
 
         return $caseSensitive;
+    }
+
+    /**
+     * Test if the local filesystem supports utf8 and unicode normalization
+     *
+     * @param string $absolutePath
+     * @return integer 0: utf8 not supported, >0: see TYPO3\CMS\Core\Charset\UnicodeNormalizer's constants
+     * @todo TODO Feature #57695: Keep in sync with TYPO3\CMS\Install\Configuration\Filesystem\Utf8Preset
+     */
+    protected function testUTF8filesystem($absolutePath)
+    {
+        $normalization = (int) $GLOBALS['TYPO3_CONF_VARS']['SYS']['UTF8filesystem'];
+        if ($normalization === 0) {
+            return 0;
+        }
+
+        $capabilities = UnicodeUtility::detectUtf8CapabilitiesForPath($absolutePath);
+
+        if ($capabilities['locale'] === false || $capabilities['escape'] === false) {
+            return 0;
+        }
+
+        if ($capabilities['normalization'][$normalization] === true) {
+            return $normalization;
+        }
+
+        return 1;
     }
 }
